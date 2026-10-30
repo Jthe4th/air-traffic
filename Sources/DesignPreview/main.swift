@@ -6,6 +6,7 @@ import OverheadKit
 import OverheadUI
 
 // Renders the TV layout to PNG so the design can be reviewed without a tvOS simulator.
+//   design-preview --icons <dir>                  app icon and Top Shelf images for the asset catalog
 //   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading, alert, ambient (append 2 or 3 for later telemetry pages)
 // Needs network access for map tiles on first run (cached afterwards by URLCache).
 
@@ -97,9 +98,44 @@ func render(_ view: some View, to url: URL) {
     print("wrote \(url.path)")
 }
 
+/// Renders every image the tvOS asset catalog needs. `--icons <dir>` writes them; scripts/ builds the catalog from them.
+@MainActor
+func renderIcons(to dir: URL) {
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    func write(_ view: some View, size: CGSize, scale: CGFloat, opaque: Bool, name: String) {
+        let renderer = ImageRenderer(content: view.frame(width: size.width, height: size.height))
+        renderer.scale = scale
+        renderer.isOpaque = opaque
+        guard let image = renderer.cgImage,
+              let dest = CGImageDestinationCreateWithURL(dir.appendingPathComponent("\(name).png") as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+            print("failed: \(name)"); return
+        }
+        CGImageDestinationAddImage(dest, image, nil)
+        CGImageDestinationFinalize(dest)
+        print("\(name).png  \(image.width)x\(image.height)")
+    }
+    let layers: [(String, AppIconArtwork.Layer)] = [("back", .back), ("middle", .middle), ("front", .front)]
+    for (name, layer) in layers {
+        write(AppIconArtwork(layer: layer), size: CGSize(width: 1280, height: 768), scale: 1, opaque: layer == .back, name: "appstore-\(name)")
+        for scale in [1, 2] {
+            write(AppIconArtwork(layer: layer), size: CGSize(width: 400, height: 240), scale: CGFloat(scale), opaque: layer == .back, name: "home-\(name)@\(scale)x")
+        }
+    }
+    write(AppIconArtwork(), size: CGSize(width: 1280, height: 768), scale: 1, opaque: true, name: "preview-icon-flat")   // for eyeballing; not in the catalog
+    for scale in [1, 2] {
+        write(AppIconArtwork(format: .banner), size: CGSize(width: 1920, height: 720), scale: CGFloat(scale), opaque: true, name: "topshelf@\(scale)x")
+        write(AppIconArtwork(format: .banner), size: CGSize(width: 2320, height: 720), scale: CGFloat(scale), opaque: true, name: "topshelfwide@\(scale)x")
+    }
+}
+
 @MainActor
 func run() async {
     let args = Array(CommandLine.arguments.dropFirst())
+    if args.first == "--icons" {
+        _ = NSApplication.shared
+        renderIcons(to: URL(fileURLWithPath: args.count > 1 ? args[1] : "icons"))
+        return
+    }
     let out = URL(fileURLWithPath: args.first ?? ".")
     try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
     let scenes = args.count > 1 ? Array(args.dropFirst()) : ["busy"]

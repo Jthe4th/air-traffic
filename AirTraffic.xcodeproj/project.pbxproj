@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		089D32EDA93DBEA1840C2300 /* OverheadKit in Frameworks */ = {isa = PBXBuildFile; productRef = B1B72BD372480D092221AD8F /* OverheadKit */; };
+		82B717DFB4F7F2CDA75166FB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D38E4A1B6D202C3933A19B2A /* Assets.xcassets */; };
 		B82A3D25432A3AAE0486E58F /* AirTrafficApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E996B8CFC562E2702A6FC5D /* AirTrafficApp.swift */; };
 		FC36A4707F095F2217030B3F /* OverheadUI in Frameworks */ = {isa = PBXBuildFile; productRef = DFA7541DBC2E0EAD268AEE75 /* OverheadUI */; };
 /* End PBXBuildFile section */
@@ -16,6 +17,7 @@
 		1E94F28AB571B46E5C085CD6 /* air-traffic */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "air-traffic"; path = .; sourceTree = SOURCE_ROOT; };
 		8E996B8CFC562E2702A6FC5D /* AirTrafficApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirTrafficApp.swift; sourceTree = "<group>"; };
 		94810A2185CD02E2F2F8CD36 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
+		D38E4A1B6D202C3933A19B2A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D4D69A65496D44181D7FD4B9 /* AirTraffic.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AirTraffic.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -60,6 +62,7 @@
 			isa = PBXGroup;
 			children = (
 				8E996B8CFC562E2702A6FC5D /* AirTrafficApp.swift */,
+				D38E4A1B6D202C3933A19B2A /* Assets.xcassets */,
 			);
 			path = tvOS;
 			sourceTree = "<group>";
@@ -90,6 +93,7 @@
 			buildConfigurationList = B9FA2A9BA434BEAA0DE072EA /* Build configuration list for PBXNativeTarget "AirTraffic" */;
 			buildPhases = (
 				7EF3E4FEC19CF6CC0F9A6B19 /* Sources */,
+				F897B112F00BA3B4D0E0D9A2 /* Resources */,
 				896ABCC52F0B61C64DC8A2AC /* Frameworks */,
 			);
 			buildRules = (
@@ -140,6 +144,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		F897B112F00BA3B4D0E0D9A2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				82B717DFB4F7F2CDA75166FB /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		7EF3E4FEC19CF6CC0F9A6B19 /* Sources */ = {
