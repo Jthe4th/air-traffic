@@ -30,6 +30,9 @@ public enum FeedProvider: String, CaseIterable, Codable, Sendable, Identifiable 
         }
     }
 
+    /// The provider used as the backup for this one.
+    public var other: FeedProvider { self == .adsbFi ? .adsbLol : .adsbFi }
+
     public func makeFeed() -> any AircraftFeed {
         switch self {
         case .adsbFi:

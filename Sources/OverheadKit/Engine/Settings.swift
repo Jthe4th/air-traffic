@@ -16,11 +16,14 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var showTrails: Bool = true
     /// Email or website sent to Planespotters with photo requests. Blank uses the app's built-in contact.
     public var photoContact: String = ""
+    /// Fall back to the other data provider when the preferred one fails.
+    public var autoFailover: Bool = true
 
     public init() {}
 
     enum CodingKeys: String, CodingKey {
         case home, homeName, mapRadiusNM, alertRadiusNM, units, feed, autoCycle, cycleSeconds, refreshSeconds, demoMode, showTrails, photoContact
+        case autoFailover
     }
 
     // Tolerant decoding so adding a setting later never wipes a saved home location.
@@ -39,6 +42,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         demoMode = try c.decodeIfPresent(Bool.self, forKey: .demoMode) ?? d.demoMode
         showTrails = try c.decodeIfPresent(Bool.self, forKey: .showTrails) ?? d.showTrails
         photoContact = try c.decodeIfPresent(String.self, forKey: .photoContact) ?? d.photoContact
+        autoFailover = try c.decodeIfPresent(Bool.self, forKey: .autoFailover) ?? d.autoFailover
     }
 }
 

@@ -17,6 +17,7 @@ public final class TrackingEngine {
     public private(set) var sightings: [Sighting] = []
     public private(set) var featuredID: String?
     public private(set) var pinned = false
+    public private(set) var diagnostics = Diagnostics()
 
     public var settings: AppSettings {
         didSet {
@@ -24,6 +25,7 @@ public final class TrackingEngine {
             if persists { SettingsStore.save(settings) }
             let needsRestart = settings.home != oldValue.home || settings.feed != oldValue.feed
                 || settings.demoMode != oldValue.demoMode || settings.refreshSeconds != oldValue.refreshSeconds
+                || settings.autoFailover != oldValue.autoFailover
             if needsRestart { restart() }
             else if settings.mapRadiusNM != oldValue.mapRadiusNM { viewRadiusDidChange() }
             if settings.photoContact != oldValue.photoContact { scheduleContactUpdate() }
@@ -133,7 +135,10 @@ public final class TrackingEngine {
         if isDemo {
             feed = DemoFeed(); routes = injectedRoutes ?? DemoRouteProvider(); photos = injectedPhotos ?? NoPhotos()
         } else {
-            feed = settings.feed.makeFeed(); routes = injectedRoutes ?? liveRoutes; photos = injectedPhotos ?? livePhotos
+            feed = settings.autoFailover
+                ? FailoverFeed(primary: settings.feed.makeFeed(), secondary: settings.feed.other.makeFeed())
+                : settings.feed.makeFeed()
+            routes = injectedRoutes ?? liveRoutes; photos = injectedPhotos ?? livePhotos
         }
     }
 
@@ -143,17 +148,22 @@ public final class TrackingEngine {
             do {
                 let radius = fetchRadiusNM
                 fetchedRadiusNM = radius
+                let started = Date()
                 let list = try await feed.fetch(around: home, radiusNM: radius)
                 if Task.isCancelled { return }
                 failures = 0
-                ingest(list, at: Date())
-                status = .live(updated: Date())
+                let finished = Date()
+                ingest(list, at: finished)
+                status = .live(updated: finished)
+                diagnostics.recordSuccess(at: finished, latency: finished.timeIntervalSince(started), count: list.count, radiusNM: radius)
             } catch is CancellationError {
                 return
             } catch {
                 if Task.isCancelled { return }
                 failures += 1
-                status = .offline((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                status = .offline(message)
+                diagnostics.recordFailure(at: Date(), message: message)
             }
             let base = max(settings.refreshSeconds, 3)
             let delay = failures == 0 ? base : min(60, base * pow(2, Double(min(failures, 5))))

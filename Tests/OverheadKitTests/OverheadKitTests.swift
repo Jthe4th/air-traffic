@@ -458,3 +458,100 @@ private func aircraft(at p: GeoPoint, track: Double, gs: Double = 400, alt: Int 
         #expect(engine.featuredID == nil)
     }
 }
+
+// MARK: - Failover and diagnostics
+private func squawking(_ code: String?, emergency: String? = nil, flags: DatabaseFlags = [], ground: Bool = false, hex: String = "e1") -> Aircraft {
+    Aircraft(hex: hex, callsign: "TST\(hex)", position: GeoPoint(latitude: 39, longitude: -77), positionTime: Date(), onGround: ground,
+             barometricAltitudeFt: ground ? nil : 20_000, groundSpeedKt: 300, trackDeg: 0, squawk: code, emergency: emergency, flags: flags)
+}
+
+/// A feed that follows a script and counts how often it is asked.
+private final class ScriptedFeed: AircraftFeed, @unchecked Sendable {
+    let name: String
+    private let lock = NSLock()
+    private var outcomes: [Result<[Aircraft], Error>]
+    private var calls = 0
+    init(_ name: String, _ outcomes: [Result<[Aircraft], Error>]) { self.name = name; self.outcomes = outcomes }
+    var callCount: Int { lock.withLock { calls } }
+    func fetch(around center: GeoPoint, radiusNM: Double) async throws -> [Aircraft] {
+        let outcome: Result<[Aircraft], Error> = lock.withLock { calls += 1; return outcomes.count > 1 ? outcomes.removeFirst() : outcomes[0] }
+        return try outcome.get()
+    }
+}
+
+private final class TestClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current = Date(timeIntervalSince1970: 1_000_000)
+    var now: Date { lock.withLock { current } }
+    func advance(_ seconds: TimeInterval) { lock.withLock { current = current.addingTimeInterval(seconds) } }
+}
+
+private struct Outage: Error, LocalizedError { var errorDescription: String? { "provider down" } }
+
+@Suite struct FailoverTests {
+    private let one = [squawking(nil, hex: "a1")]
+    private let two = [squawking(nil, hex: "b1"), squawking(nil, hex: "b2")]
+    private let here = GeoPoint(latitude: 39, longitude: -77)
+
+    @Test func usesThePreferredProviderWhileItWorks() async throws {
+        let p = ScriptedFeed("primary", [.success(one)]), b = ScriptedFeed("backup", [.success(two)])
+        let feed = FailoverFeed(primary: p, secondary: b)
+        #expect(try await feed.fetch(around: here, radiusNM: 20).count == 1)
+        #expect(feed.name == "primary" && b.callCount == 0)
+    }
+
+    @Test func fallsBackWithinTheSamePollSoThereIsNoGap() async throws {
+        let p = ScriptedFeed("primary", [.failure(Outage())]), b = ScriptedFeed("backup", [.success(two)])
+        let feed = FailoverFeed(primary: p, secondary: b)
+        #expect(try await feed.fetch(around: here, radiusNM: 20).count == 2)
+        #expect(feed.name == "backup (backup)" && p.callCount == 1 && b.callCount == 1)
+    }
+
+    @Test func staysOnTheBackupForTheRetryWindowThenReturns() async throws {
+        let clock = TestClock()
+        let p = ScriptedFeed("primary", [.failure(Outage()), .success(one)]), b = ScriptedFeed("backup", [.success(two)])
+        let feed = FailoverFeed(primary: p, secondary: b, retryAfter: 120, now: { clock.now })
+        _ = try await feed.fetch(around: here, radiusNM: 20)             // primary fails, backup serves
+        clock.advance(60)
+        _ = try await feed.fetch(around: here, radiusNM: 20)             // still inside the window
+        #expect(p.callCount == 1 && b.callCount == 2)
+        clock.advance(61)
+        #expect(try await feed.fetch(around: here, radiusNM: 20).count == 1)   // window over: primary again, and it works
+        #expect(p.callCount == 2 && feed.name == "primary")
+    }
+
+    @Test func reportsThePreferredProvidersErrorWhenBothFail() async {
+        let p = ScriptedFeed("primary", [.failure(Outage())]), b = ScriptedFeed("backup", [.failure(FeedError.http(503))])
+        let feed = FailoverFeed(primary: p, secondary: b)
+        await #expect(throws: Outage.self) { try await feed.fetch(around: here, radiusNM: 20) }
+    }
+
+    @Test func cancellationIsNeverTreatedAsAnOutage() async {
+        let p = ScriptedFeed("primary", [.failure(CancellationError())]), b = ScriptedFeed("backup", [.success(two)])
+        let feed = FailoverFeed(primary: p, secondary: b)
+        await #expect(throws: CancellationError.self) { try await feed.fetch(around: here, radiusNM: 20) }
+        #expect(b.callCount == 0)
+    }
+
+    @Test func providersPairWithEachOther() {
+        #expect(FeedProvider.adsbFi.other == .adsbLol && FeedProvider.adsbLol.other == .adsbFi)
+    }
+}
+
+@Suite struct DiagnosticsAndSettingsTests {
+    @Test func tallyRecordsSuccessesAndFailures() {
+        var d = Diagnostics()
+        let t = Date()
+        d.recordSuccess(at: t, latency: 0.2346, count: 17, radiusNM: 40)
+        d.recordFailure(at: t.addingTimeInterval(5), message: "boom")
+        #expect(d.successes == 1 && d.failures == 1)
+        #expect(d.lastLatencyMs == 235 && d.lastAircraftCount == 17 && d.lastError == "boom")
+    }
+
+    @Test func oldSavedSettingsStillLoadWithNewDefaults() throws {
+        let old = #"{"home":{"latitude":39,"longitude":-77},"homeName":"Somewhere","units":"metric"}"#
+        let s = try JSONDecoder().decode(AppSettings.self, from: Data(old.utf8))
+        #expect(s.homeName == "Somewhere" && s.units == .metric)
+        #expect(s.autoFailover)
+    }
+}

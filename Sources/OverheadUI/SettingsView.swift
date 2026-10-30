@@ -50,6 +50,7 @@ struct SettingsView: View {
                 displaySection
                 dataSection
                 photosSection
+                diagnosticsSection
                 aboutSection
                 Section { Button("Done") { dismiss() } }
             }
@@ -133,6 +134,7 @@ struct SettingsView: View {
             Picker("Aircraft data", selection: $engine.settings.feed) {
                 ForEach(FeedProvider.allCases) { Text($0.title).tag($0) }
             }
+            Toggle("Use the other provider if this one fails", isOn: $engine.settings.autoFailover)
             Toggle("Demo mode (fictional traffic)", isOn: $engine.settings.demoMode)
         } header: {
             Text("Data")
@@ -154,6 +156,25 @@ struct SettingsView: View {
             Text("Aircraft photos")
         } footer: {
             Text("Planespotters asks apps to identify a contact. It is sent only to Planespotters, never to the map or flight-data services. Leave blank to use this app's built-in contact, if it has one.")
+        }
+    }
+
+    private var diagnosticsSection: some View {
+        let d = engine.diagnostics
+        return Section {
+            LabeledContent("Data source", value: engine.sourceName)
+            LabeledContent("Last update") {
+                if let last = d.lastSuccess { Text(last, style: .relative) + Text(" ago") } else { Text("None yet") }
+            }
+            LabeledContent("Response time", value: d.lastLatencyMs.map { "\($0) ms" } ?? "n/a")
+            LabeledContent("Aircraft in last response", value: d.lastAircraftCount.map(String.init) ?? "n/a")
+            LabeledContent("Requests", value: "\(d.successes) succeeded, \(d.failures) failed")
+            if let error = d.lastError { LabeledContent("Last error", value: error) }
+            LabeledContent("Running for") { Text(d.startedAt, style: .relative) }
+        } header: {
+            Text("Connection")
+        } footer: {
+            Text("Useful when something looks wrong: it shows which provider is answering and how recently.")
         }
     }
 
