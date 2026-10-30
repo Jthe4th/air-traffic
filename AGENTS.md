@@ -82,6 +82,10 @@ fail (write it, watch it fail, then fix).
   asset catalog small.
 - **CI:** `.github/workflows/ci.yml` mirrors the local commands. It can't be run locally, so after changing it push
   and watch the run.
+- **Device Hub:** while Xcode's Device Hub app is connected to the Apple TV (screen view or remote buttons), tvOS draws
+  two thin red lines across the top and bottom of the screen. They are a system overlay, absent from
+  `devicectl device capture screenshot`, and they survive closing the window and rebooting the TV. Quit the whole app
+  when you are done. Prefer `devicectl` (install, launch, capture screenshot) where it can answer the question.
 - **Menu button:** the main screen deliberately swallows Menu (`onExitCommand` in `TVDashboardView`) so it can't close
   an always-on display; Settings is left to dismiss itself. This may conflict with App Store review (see ROADMAP).
 - **Focus:** use `FlatButtonStyle` and read `@Environment(\.isFocused)` inside the label, so tvOS's built-in lift
