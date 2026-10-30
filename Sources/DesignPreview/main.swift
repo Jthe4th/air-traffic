@@ -6,7 +6,7 @@ import OverheadKit
 import OverheadUI
 
 // Renders the TV layout to PNG so the design can be reviewed without a tvOS simulator.
-//   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto (append 2 or 3 for later telemetry pages)
+//   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading (append 2 or 3 for later telemetry pages)
 // Needs network access for map tiles on first run (cached afterwards by URLCache).
 
 @MainActor
@@ -34,7 +34,9 @@ func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEn
     if scene == "welcome" { settings.home = nil }
     if scene == "zoomin" { settings.mapRadiusNM = 5 / Geo.milesPerNM }
     if scene == "zoomout" || scene == "crowded" { settings.mapRadiusNM = 60 / Geo.milesPerNM }
-    let photo = AircraftPhoto(imageURL: photoURL, pageURL: nil, photographer: "Alex Example")
+    // "photoloading": the photo's address is known but the image hasn't arrived (this file never exists).
+    let imageURL = scene == "photoloading" ? URL(fileURLWithPath: "/nonexistent/photo.png") : photoURL
+    let photo = AircraftPhoto(imageURL: imageURL, pageURL: nil, photographer: "Alex Example")
     struct Photos: PhotoProviding {
         let photo: AircraftPhoto
         func photo(for aircraft: Aircraft) async -> AircraftPhoto? { aircraft.hex == "a5c8b9" ? nil : photo }
@@ -48,7 +50,7 @@ func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEn
                             positionTime: date, onGround: true, groundSpeedKt: 12, trackDeg: 90, wakeClass: .large)]
     }
     engine.ingest(flights, at: date)
-    if scene == "busy" || scene == "nophoto" { engine.pin(scene == "nophoto" ? "a5c8b9" : "a8b001", now: date) }
+    if scene == "busy" || scene == "nophoto" || scene == "photoloading" { engine.pin(scene == "nophoto" ? "a5c8b9" : "a8b001", now: date) }
     try? await Task.sleep(for: .milliseconds(400))   // let route/photo lookups land
     if let id = engine.featuredID, let t = engine.aircraft.first(where: { $0.id == id }), let url = t.photo?.imageURL {
         await ImageStore.shared.load(url)

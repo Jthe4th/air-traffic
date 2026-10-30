@@ -49,12 +49,12 @@ private struct PhotoHeader: View {
         let a = tracked.aircraft
         let tint = Theme.altitudeColor(a.altitudeFt.map(Double.init), onGround: a.onGround)
         ZStack(alignment: .topLeading) {
+            // The backdrop is always there, so the photo fades in over it instead of over an empty box.
+            backdrop(tint: tint)
             if let photo = tracked.photo {
                 CachedImage(url: photo.imageURL)
                     .frame(width: DetailPanel.width - 56, height: 230)
                     .clipped()
-            } else {
-                backdrop(tint: tint)
             }
             LinearGradient(colors: [.black.opacity(0.55), .clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
 

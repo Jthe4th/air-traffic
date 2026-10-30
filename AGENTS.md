@@ -37,7 +37,7 @@ swift build --target OverheadUI --sdk "$(xcrun --sdk appletvos --show-sdk-path)"
 swift build --target OverheadUI --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" --triple arm64-apple-ios17.0 --scratch-path $S-ios
 
 # Render the UI to images and look at them:
-swift run --scratch-path $S design-preview ./Preview busy quiet nophoto welcome zoomin zoomout crowded
+swift run --scratch-path $S design-preview ./Preview busy quiet nophoto welcome zoomin zoomout crowded photoloading
 
 xcodegen generate                                   # after editing project.yml
 xcrun devicectl list devices                        # find the Apple TV's identifier

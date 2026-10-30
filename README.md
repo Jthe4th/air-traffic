@@ -71,7 +71,7 @@ Tests/OverheadKitTests  unit tests, including an anonymised adsb.fi capture
 
 ```bash
 swift test --scratch-path ~/Library/Caches/air-traffic-build            # unit tests
-swift run --scratch-path ~/Library/Caches/air-traffic-build design-preview ./Preview busy quiet nophoto welcome zoomin zoomout crowded
+swift run --scratch-path ~/Library/Caches/air-traffic-build design-preview ./Preview busy quiet nophoto welcome zoomin zoomout crowded photoloading
 ```
 
 Keep build output outside this folder; it lives in OneDrive. Scenes ending in `2` or `3` show the later
