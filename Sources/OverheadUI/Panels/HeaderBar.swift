@@ -3,6 +3,7 @@ import OverheadKit
 
 struct HeaderBar: View {
     let engine: TrackingEngine
+    var controlsHidden = false
     var onSettings: () -> Void
 
     var body: some View {
@@ -11,6 +12,8 @@ struct HeaderBar: View {
             Spacer(minLength: 0)
             ClockView()
             SettingsButton(action: onSettings)
+                .opacity(controlsHidden ? 0 : 1)
+                .animation(.easeInOut(duration: 0.9), value: controlsHidden)
         }
         // The row spans the full width, so one swipe up from any chip lands on the gear.
         #if !os(iOS)

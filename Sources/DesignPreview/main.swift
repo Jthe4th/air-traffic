@@ -6,7 +6,7 @@ import OverheadKit
 import OverheadUI
 
 // Renders the TV layout to PNG so the design can be reviewed without a tvOS simulator.
-//   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading, alert (append 2 or 3 for later telemetry pages)
+//   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading, alert, ambient (append 2 or 3 for later telemetry pages)
 // Needs network access for map tiles on first run (cached afterwards by URLCache).
 
 @MainActor
@@ -115,7 +115,10 @@ func run() async {
         let engine = await makeEngine(scene: name, photoURL: photoURL, at: date)
         let camera = TVDashboardView.camera(for: engine)
         await ImageStore.shared.prefetch(camera.tiles.map { MapStyle.url(for: $0) })
-        render(TVDashboardView(engine: engine).fixedClock(date.addingTimeInterval(pageOffset)), to: out.appendingPathComponent("\(scene).png"))
+        let ambient = Ambient()
+        if name == "ambient" { ambient.isFrozen = true; ambient.controlsHidden = true; ambient.isNight = true; ambient.shift = CGSize(width: 5, height: -4) }
+        else { ambient.isFrozen = true }
+        render(TVDashboardView(engine: engine, ambient: ambient).fixedClock(date.addingTimeInterval(pageOffset)), to: out.appendingPathComponent("\(scene).png"))
     }
 }
 

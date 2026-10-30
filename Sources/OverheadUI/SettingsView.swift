@@ -124,6 +124,11 @@ struct SettingsView: View {
             Picker("Units", selection: $engine.settings.units) {
                 ForEach(UnitSystem.allCases) { Text($0.title).tag($0) }
             }
+            Picker("Hide controls when idle", selection: $engine.settings.idleHideSeconds) {
+                Text("Never").tag(0.0)
+                ForEach([10.0, 15, 30, 60], id: \.self) { Text("After \(Int($0)) seconds").tag($0) }
+            }
+            Toggle("Dim at night (10 PM to 6 AM)", isOn: $engine.settings.nightDimming)
             Toggle("Flight trails", isOn: $engine.settings.showTrails)
             Toggle("Rotate through aircraft overhead", isOn: $engine.settings.autoCycle)
         }

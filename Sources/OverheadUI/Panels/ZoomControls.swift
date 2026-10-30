@@ -29,10 +29,14 @@ private struct ZoomButton: View {
     let symbol: String
     let enabled: Bool
     let action: () -> Void
+    @Environment(\.ambient) private var ambient
 
     var body: some View {
         // Stays focusable at the limits (just dimmed), so focus doesn't jump away when you hit the end.
-        Button(action: { if enabled { action() } }) { Face(symbol: symbol, enabled: enabled) }
+        Button(action: {
+            if ambient?.consumeWakeUp() == true { return }
+            if enabled { action() }
+        }) { Face(symbol: symbol, enabled: enabled) }
             .buttonStyle(FlatButtonStyle())
     }
 

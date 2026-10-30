@@ -624,6 +624,6 @@ private struct Outage: Error, LocalizedError { var errorDescription: String? { "
         let old = #"{"home":{"latitude":39,"longitude":-77},"homeName":"Somewhere","units":"metric"}"#
         let s = try JSONDecoder().decode(AppSettings.self, from: Data(old.utf8))
         #expect(s.homeName == "Somewhere" && s.units == .metric)
-        #expect(s.autoFailover && s.alertLevel == .emergencyAndNotable)
+        #expect(s.idleHideSeconds == 15 && s.nightDimming && s.autoFailover && s.alertLevel == .emergencyAndNotable)
     }
 }
