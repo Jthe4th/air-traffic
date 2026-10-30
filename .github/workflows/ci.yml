@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Test
+        run: swift test
+
+  platforms:
+    name: Builds for tvOS and iOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shared code for tvOS
+        run: swift build --target OverheadUI --sdk "$(xcrun --sdk appletvos --show-sdk-path)" --triple arm64-apple-tvos17.0
+      - name: Shared code for iOS
+        run: swift build --target OverheadUI --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" --triple arm64-apple-ios17.0
+      - name: The tvOS app, unsigned (includes the icon asset catalog)
+        run: |
+          xcodebuild -project AirTraffic.xcodeproj -scheme AirTraffic \
+            -sdk appletvos -configuration Debug CODE_SIGNING_ALLOWED=NO build
