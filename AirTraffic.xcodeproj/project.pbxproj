@@ -1,0 +1,361 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		089D32EDA93DBEA1840C2300 /* OverheadKit in Frameworks */ = {isa = PBXBuildFile; productRef = B1B72BD372480D092221AD8F /* OverheadKit */; };
+		B82A3D25432A3AAE0486E58F /* AirTrafficApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E996B8CFC562E2702A6FC5D /* AirTrafficApp.swift */; };
+		FC36A4707F095F2217030B3F /* OverheadUI in Frameworks */ = {isa = PBXBuildFile; productRef = DFA7541DBC2E0EAD268AEE75 /* OverheadUI */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		1E94F28AB571B46E5C085CD6 /* air-traffic */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "air-traffic"; path = .; sourceTree = SOURCE_ROOT; };
+		8E996B8CFC562E2702A6FC5D /* AirTrafficApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirTrafficApp.swift; sourceTree = "<group>"; };
+		94810A2185CD02E2F2F8CD36 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
+		D4D69A65496D44181D7FD4B9 /* AirTraffic.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AirTraffic.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		896ABCC52F0B61C64DC8A2AC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FC36A4707F095F2217030B3F /* OverheadUI in Frameworks */,
+				089D32EDA93DBEA1840C2300 /* OverheadKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4250C0F2CB58467F5FD27DD4 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				94810A2185CD02E2F2F8CD36 /* App.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		9700628A2284C97B7575E9FF /* Apps */ = {
+			isa = PBXGroup;
+			children = (
+				DB0F43733ACE3A7D27DD8B3E /* tvOS */,
+			);
+			path = Apps;
+			sourceTree = "<group>";
+		};
+		C00E7B4238F4245152A0605D /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				1E94F28AB571B46E5C085CD6 /* air-traffic */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		DB0F43733ACE3A7D27DD8B3E /* tvOS */ = {
+			isa = PBXGroup;
+			children = (
+				8E996B8CFC562E2702A6FC5D /* AirTrafficApp.swift */,
+			);
+			path = tvOS;
+			sourceTree = "<group>";
+		};
+		DBBD38385ECB7C3082DC6E0C = {
+			isa = PBXGroup;
+			children = (
+				9700628A2284C97B7575E9FF /* Apps */,
+				4250C0F2CB58467F5FD27DD4 /* Config */,
+				C00E7B4238F4245152A0605D /* Packages */,
+				FAD1EC4564E2F2CB3CC506EB /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		FAD1EC4564E2F2CB3CC506EB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D4D69A65496D44181D7FD4B9 /* AirTraffic.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		81FCBF267C332C5C81D73906 /* AirTraffic */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B9FA2A9BA434BEAA0DE072EA /* Build configuration list for PBXNativeTarget "AirTraffic" */;
+			buildPhases = (
+				7EF3E4FEC19CF6CC0F9A6B19 /* Sources */,
+				896ABCC52F0B61C64DC8A2AC /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AirTraffic;
+			packageProductDependencies = (
+				DFA7541DBC2E0EAD268AEE75 /* OverheadUI */,
+				B1B72BD372480D092221AD8F /* OverheadKit */,
+			);
+			productName = AirTraffic;
+			productReference = D4D69A65496D44181D7FD4B9 /* AirTraffic.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0D3BCFBE280B8DA7F10326DA /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					81FCBF267C332C5C81D73906 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 5560569ADC1411CB14C52F7A /* Build configuration list for PBXProject "AirTraffic" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = DBBD38385ECB7C3082DC6E0C;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5111191022A6EB433BB485A7 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = FAD1EC4564E2F2CB3CC506EB /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				81FCBF267C332C5C81D73906 /* AirTraffic */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		7EF3E4FEC19CF6CC0F9A6B19 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B82A3D25432A3AAE0486E58F /* AirTrafficApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		7E40025DEFCFA09B60EC2CDE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				AT_RELEASE_CHANNEL = beta;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Apps/tvOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.feezerj.AirTraffic;
+				SDKROOT = appletvos;
+				TARGETED_DEVICE_FAMILY = 3;
+			};
+			name = Release;
+		};
+		8E15978657C2D400D780BD3F /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 94810A2185CD02E2F2F8CD36 /* App.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Release;
+		};
+		A6E0BF783CBB104E5195AFAD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 94810A2185CD02E2F2F8CD36 /* App.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Debug;
+		};
+		A8654B2B777002B3EAB452B9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				AT_RELEASE_CHANNEL = beta;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Apps/tvOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.feezerj.AirTraffic;
+				SDKROOT = appletvos;
+				TARGETED_DEVICE_FAMILY = 3;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5560569ADC1411CB14C52F7A /* Build configuration list for PBXProject "AirTraffic" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A6E0BF783CBB104E5195AFAD /* Debug */,
+				8E15978657C2D400D780BD3F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B9FA2A9BA434BEAA0DE072EA /* Build configuration list for PBXNativeTarget "AirTraffic" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A8654B2B777002B3EAB452B9 /* Debug */,
+				7E40025DEFCFA09B60EC2CDE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		5111191022A6EB433BB485A7 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B1B72BD372480D092221AD8F /* OverheadKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = OverheadKit;
+		};
+		DFA7541DBC2E0EAD268AEE75 /* OverheadUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = OverheadUI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 0D3BCFBE280B8DA7F10326DA /* Project object */;
+}

@@ -1,0 +1,14 @@
+// Build-time defaults for the app. Personal values go in Config/Local.xcconfig (git-ignored, optional).
+
+// Signing team: set DEVELOPMENT_TEAM in Config/Local.xcconfig, or pick a team in Xcode > Signing & Capabilities.
+
+// Contact (email or website) sent to Planespotters with photo requests. It is the app's built-in default;
+// anyone can override it in the app's Settings. Photos stay off while neither is set.
+AT_CONTACT =
+
+// Optional alternative map tile server, e.g. a dark style you have a key for. {z} {x} {y}; add @2x for
+// 512 px tiles. NOTE: in an xcconfig, write "//" as "/$()/" or the rest of the line is treated as a comment.
+AT_TILE_URL =
+AT_TILE_ATTRIBUTION =
+
+#include? "Local.xcconfig"

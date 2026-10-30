@@ -1,0 +1,4 @@
+// Copy to Local.xcconfig (git-ignored) and edit.
+AT_CONTACT = you@example.com
+// Your signing team's ID (Xcode > Settings > Accounts, or Signing & Capabilities).
+DEVELOPMENT_TEAM = ABCDE12345
