@@ -6,6 +6,7 @@ public struct TVDashboardView: View {
     @Bindable var engine: TrackingEngine
     @State private var showSettings = false
     @FocusState private var welcomeFocused: Bool
+    @Environment(\.fixedNow) private var fixedNow
 
     static let canvas = CGSize(width: 1920, height: 1080)
     /// Where "home" sits on the canvas: centred in the space to the right of the aircraft card.
@@ -72,6 +73,12 @@ public struct TVDashboardView: View {
 
             ZoomControls(engine: engine)
                 .offset(x: 1750, y: 410)
+
+            TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                AlertBanner(alerts: engine.alerts(at: fixedNow ?? timeline.date), units: engine.settings.units)
+            }
+            .frame(width: 1000)
+            .offset(x: 840, y: 206)
 
             if engine.needsLocation {
                 WelcomeCard(focus: $welcomeFocused) { showSettings = true }

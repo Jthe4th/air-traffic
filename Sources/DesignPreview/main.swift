@@ -6,7 +6,7 @@ import OverheadKit
 import OverheadUI
 
 // Renders the TV layout to PNG so the design can be reviewed without a tvOS simulator.
-//   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading (append 2 or 3 for later telemetry pages)
+//   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading, alert (append 2 or 3 for later telemetry pages)
 // Needs network access for map tiles on first run (cached afterwards by URLCache).
 
 @MainActor
@@ -48,6 +48,11 @@ func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEn
     if scene == "ground" {
         flights = [Aircraft(hex: "g1", callsign: "UAL1348", registration: "N77295", typeCode: "B739", position: engine.home,
                             positionTime: date, onGround: true, groundSpeedKt: 12, trackDeg: 90, wakeClass: .large)]
+    }
+    if scene == "alert" {
+        // A squawk of 7700 must hold for a few seconds before it is shown, so report it twice.
+        flights[0].squawk = "7700"
+        engine.ingest(flights, at: date.addingTimeInterval(-20))
     }
     engine.ingest(flights, at: date)
     if scene == "busy" || scene == "nophoto" || scene == "photoloading" { engine.pin(scene == "nophoto" ? "a5c8b9" : "a8b001", now: date) }

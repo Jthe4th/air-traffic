@@ -81,7 +81,8 @@ struct MapOverlay: View {
         TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
             let painter = MapPainter(
                 camera: camera, now: fixedNow ?? timeline.date, home: engine.home, settings: engine.settings,
-                items: engine.aircraft, featuredID: engine.featuredID)
+                items: engine.aircraft, featuredID: engine.featuredID,
+                alertIDs: Set(engine.alerts(at: fixedNow ?? timeline.date).map(\.id)))
             Canvas { context, _ in painter.paint(&context) }
         }
         .allowsHitTesting(false)
@@ -95,6 +96,7 @@ struct MapPainter {
     let settings: AppSettings
     let items: [TrackedAircraft]
     let featuredID: String?
+    var alertIDs: Set<String> = []
 
     /// Markers shrink as the view widens so a crowded sky stays legible.
     private var sizeFactor: CGFloat { CGFloat(min(1, max(0.62, 21.7 / settings.mapRadiusNM))) }
@@ -262,6 +264,16 @@ struct MapPainter {
         let size = glyphSize(a, featured: featured)
         let glyph = Silhouettes.path(AircraftTypes.silhouette(for: a), center: pos, size: size, headingDeg: a.trackDeg ?? a.trueHeadingDeg ?? 0)
 
+        if alertIDs.contains(t.id) {
+            let phase = now.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.2) / 1.2
+            let base = size * 1.2
+            let r = base + 30 * phase
+            ctx.stroke(Path(ellipseIn: CGRect(x: pos.x - r, y: pos.y - r, width: r * 2, height: r * 2)),
+                       with: .color(Theme.danger.opacity(0.85 * (1 - phase))), lineWidth: 4)
+            let disc = Path(ellipseIn: CGRect(x: pos.x - base, y: pos.y - base, width: base * 2, height: base * 2))
+            ctx.fill(disc, with: .color(Theme.danger.opacity(0.22)))
+            ctx.stroke(disc, with: .color(Theme.danger.opacity(0.95)), lineWidth: 3)
+        }
         if featured {
             let phase = now.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.8) / 1.8
             let base = size * 0.95

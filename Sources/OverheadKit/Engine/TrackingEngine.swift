@@ -46,6 +46,9 @@ public final class TrackingEngine {
 
     @ObservationIgnored private var contactTask: Task<Void, Never>?
     @ObservationIgnored private var fetchedRadiusNM = 0.0
+    @ObservationIgnored private var emergencySince: [String: Date] = [:]
+    /// An emergency squawk must hold this long before it is shown; pilots dialling a code pass through 7700 briefly.
+    @ObservationIgnored var emergencyConfirmAfter: TimeInterval = 12
     @ObservationIgnored private let injectedRoutes: (any RouteProviding)?
     @ObservationIgnored private let injectedPhotos: (any PhotoProviding)?
 
@@ -79,6 +82,23 @@ public final class TrackingEngine {
         let limit = settings.mapRadiusNM * 1.08
         let center = home
         return aircraft.filter { Geo.distanceNM(center, $0.aircraft.position(at: now)) <= limit }
+    }
+
+    /// Aircraft worth a banner right now, emergencies first, then nearest first.
+    public func alerts(at now: Date = Date()) -> [AircraftAlert] {
+        guard settings.alertLevel != .off else { return [] }
+        let center = home, onMapLimit = settings.mapRadiusNM * 1.08
+        let found: [AircraftAlert] = aircraft.compactMap { t in
+            guard let kind = Alerts.evaluate(t.aircraft, level: settings.alertLevel) else { return nil }
+            if kind.isEmergency {
+                guard let since = emergencySince[t.id], now.timeIntervalSince(since) >= emergencyConfirmAfter else { return nil }
+            }
+            let d = Geo.distanceNM(center, t.aircraft.position(at: now))
+            return AircraftAlert(id: t.id, kind: kind, title: t.flightNumber ?? t.aircraft.title, distanceNM: d, onMap: d <= onMapLimit)
+        }
+        return found.sorted { a, b in
+            a.kind.isEmergency != b.kind.isEmergency ? a.kind.isEmergency : a.distanceNM < b.distanceNM
+        }
     }
 
     public var canZoomIn: Bool { MapZoom.zoomedIn(from: settings.mapRadiusNM, units: settings.units) != nil }
@@ -213,6 +233,11 @@ public final class TrackingEngine {
         // Aircraft missing from one response keep coasting for a while rather than blinking out.
         for (_, old) in previous where now.timeIntervalSince(old.aircraft.positionTime) < 45 { merged.append(old) }
 
+        for t in merged {
+            if Alerts.evaluate(t.aircraft, level: .emergency) != nil { emergencySince[t.id] = emergencySince[t.id] ?? now }
+            else { emergencySince[t.id] = nil }
+        }
+        emergencySince = emergencySince.filter { id, _ in merged.contains { $0.id == id } }
         merged.sort { Geo.distanceNM(center, $0.aircraft.position(at: now)) < Geo.distanceNM(center, $1.aircraft.position(at: now)) }
         aircraft = merged
         recordSightings(now: now)
@@ -249,6 +274,13 @@ public final class TrackingEngine {
 
         // Only aircraft on the map are candidates; ones fetched just beyond the edge are not.
         let airborne = aircraft.filter { !$0.aircraft.onGround && inView($0) }
+
+        // An aircraft in distress on the map takes the card straight away (unless the viewer picked one).
+        if let urgent = airborne.first(where: { Alerts.evaluate($0.aircraft, level: .emergency) != nil
+            && now.timeIntervalSince(emergencySince[$0.id] ?? now) >= emergencyConfirmAfter }) {
+            if featuredID != urgent.id { featuredID = urgent.id }
+            return
+        }
         let inside = airborne.filter { Geo.distanceNM(center, $0.aircraft.position(at: now)) <= settings.alertRadiusNM }
         let insideSet = Set(inside.map(\.id))
         let newcomers = insideSet.subtracting(insideIDs)

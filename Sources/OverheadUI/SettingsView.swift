@@ -135,6 +135,9 @@ struct SettingsView: View {
                 ForEach(FeedProvider.allCases) { Text($0.title).tag($0) }
             }
             Toggle("Use the other provider if this one fails", isOn: $engine.settings.autoFailover)
+            Picker("Alerts", selection: $engine.settings.alertLevel) {
+                ForEach(AlertLevel.allCases) { Text($0.title).tag($0) }
+            }
             Toggle("Demo mode (fictional traffic)", isOn: $engine.settings.demoMode)
         } header: {
             Text("Data")

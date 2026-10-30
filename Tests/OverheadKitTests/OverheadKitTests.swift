@@ -459,10 +459,38 @@ private func aircraft(at p: GeoPoint, track: Double, gs: Double = 400, alt: Int 
     }
 }
 
-// MARK: - Failover and diagnostics
+// MARK: - Alerts, failover, diagnostics
 private func squawking(_ code: String?, emergency: String? = nil, flags: DatabaseFlags = [], ground: Bool = false, hex: String = "e1") -> Aircraft {
     Aircraft(hex: hex, callsign: "TST\(hex)", position: GeoPoint(latitude: 39, longitude: -77), positionTime: Date(), onGround: ground,
              barometricAltitudeFt: ground ? nil : 20_000, groundSpeedKt: 300, trackDeg: 0, squawk: code, emergency: emergency, flags: flags)
+}
+
+@Suite struct AlertTests {
+    @Test func emergencySquawksAreEmergencies() {
+        for code in ["7500", "7600", "7700"] {
+            #expect(Alerts.evaluate(squawking(code), level: .emergency)?.isEmergency == true)
+        }
+        #expect(Alerts.evaluate(squawking("1200"), level: .emergencyAndNotable) == nil)
+    }
+
+    @Test func theEmergencyFieldCountsButMedicalFlightsDoNot() {
+        #expect(Alerts.evaluate(squawking(nil, emergency: "nordo"), level: .emergency)?.isEmergency == true)
+        #expect(Alerts.evaluate(squawking(nil, emergency: "minfuel"), level: .emergency)?.isEmergency == true)
+        #expect(Alerts.evaluate(squawking(nil, emergency: "lifeguard"), level: .emergencyAndNotable) == nil)
+    }
+
+    @Test func levelsFilterWhatIsShown() {
+        let notable = squawking("1200", flags: [.interesting])
+        #expect(Alerts.evaluate(notable, level: .emergencyAndNotable) == .notable)
+        #expect(Alerts.evaluate(notable, level: .emergency) == nil)
+        #expect(Alerts.evaluate(squawking("7700"), level: .off) == nil)
+        // Plain military aircraft are common near bases and are not alerts by themselves.
+        #expect(Alerts.evaluate(squawking("1200", flags: [.military]), level: .emergencyAndNotable) == nil)
+    }
+
+    @Test func groundTrafficIsIgnored() {
+        #expect(Alerts.evaluate(squawking("7700", ground: true), level: .emergency) == nil)
+    }
 }
 
 /// A feed that follows a script and counts how often it is asked.
@@ -538,6 +566,50 @@ private struct Outage: Error, LocalizedError { var errorDescription: String? { "
     }
 }
 
+@MainActor
+@Suite struct EngineAlertTests {
+    private func plane(_ id: String, atNM d: Double, squawk: String? = nil, home: GeoPoint, now: Date) -> Aircraft {
+        Aircraft(hex: id, callsign: id.uppercased(), position: Geo.destination(from: home, bearing: 30, distanceNM: d), positionTime: now,
+                 barometricAltitudeFt: 20_000, groundSpeedKt: 300, trackDeg: 0, squawk: squawk)
+    }
+
+    @Test func anEmergencyIsHeldBackUntilItHasPersisted() {
+        let engine = TrackingEngine(settings: AppSettings(), persists: false)
+        let t0 = Date(), home = engine.home
+        engine.ingest([plane("sos", atNM: 10, squawk: "7700", home: home, now: t0)], at: t0)
+        #expect(engine.alerts(at: t0).isEmpty)                                   // could be a code passing through 7700
+        #expect(engine.alerts(at: t0.addingTimeInterval(13)).map(\.id) == ["sos"])
+    }
+
+    @Test func aBrieflyDialledCodeNeverBecomesAnAlert() {
+        let engine = TrackingEngine(settings: AppSettings(), persists: false)
+        let t0 = Date(), home = engine.home
+        engine.ingest([plane("blip", atNM: 10, squawk: "7700", home: home, now: t0)], at: t0)
+        engine.ingest([plane("blip", atNM: 10, squawk: "7000", home: home, now: t0.addingTimeInterval(5))], at: t0.addingTimeInterval(5))
+        #expect(engine.alerts(at: t0.addingTimeInterval(30)).isEmpty)
+    }
+
+    @Test func anEmergencyOnTheMapTakesTheCardButAPinWins() {
+        let engine = TrackingEngine(settings: AppSettings(), persists: false)
+        engine.emergencyConfirmAfter = 0
+        let t0 = Date(), home = engine.home
+        engine.ingest([plane("near", atNM: 2, home: home, now: t0), plane("sos", atNM: 15, squawk: "7700", home: home, now: t0)], at: t0)
+        #expect(engine.featuredID == "sos")                                       // nearer plane is overridden
+        engine.pin("near", now: t0)
+        engine.ingest([plane("near", atNM: 2, home: home, now: t0), plane("sos", atNM: 15, squawk: "7700", home: home, now: t0)], at: t0.addingTimeInterval(2))
+        #expect(engine.featuredID == "near")
+    }
+
+    @Test func alertsCanBeTurnedOff() {
+        var s = AppSettings(); s.alertLevel = .off
+        let engine = TrackingEngine(settings: s, persists: false)
+        engine.emergencyConfirmAfter = 0
+        let t0 = Date()
+        engine.ingest([plane("sos", atNM: 10, squawk: "7700", home: engine.home, now: t0)], at: t0)
+        #expect(engine.alerts(at: t0.addingTimeInterval(60)).isEmpty)
+    }
+}
+
 @Suite struct DiagnosticsAndSettingsTests {
     @Test func tallyRecordsSuccessesAndFailures() {
         var d = Diagnostics()
@@ -552,6 +624,6 @@ private struct Outage: Error, LocalizedError { var errorDescription: String? { "
         let old = #"{"home":{"latitude":39,"longitude":-77},"homeName":"Somewhere","units":"metric"}"#
         let s = try JSONDecoder().decode(AppSettings.self, from: Data(old.utf8))
         #expect(s.homeName == "Somewhere" && s.units == .metric)
-        #expect(s.autoFailover)
+        #expect(s.autoFailover && s.alertLevel == .emergencyAndNotable)
     }
 }
