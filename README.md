@@ -81,6 +81,13 @@ telemetry pages. Verified by: tests, compiling OverheadKit/OverheadUI against th
 See [ROADMAP.md](ROADMAP.md). Known gaps today: no app icon, Menu exits the app, photos need a contact configured,
 and remote focus around the newest controls and performance on older Apple TV hardware are unconfirmed.
 
+## Credits
+
+Inspired by [Overhead](https://github.com/alexlmiller/overhead) by alexlmiller (MIT), a quiet full-screen aircraft
+display for Home Assistant and browsers. Air Traffic is an independent Swift implementation for Apple TV and shares
+no code with it. It borrows a few ideas: a calm display built around the nearest aircraft with recent sightings,
+and rejecting a reported route unless the aircraft's position and heading fit it.
+
 ## License
 
 [MIT](LICENSE). Third-party data and marks (airline names, aircraft photos, map tiles, flight data) belong to their
