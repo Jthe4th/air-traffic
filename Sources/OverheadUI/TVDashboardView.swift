@@ -35,6 +35,9 @@ public struct TVDashboardView: View {
         .onPlayPauseCommand {
             if engine.pinned { engine.unpin() } else if let id = engine.featuredID { engine.pin(id) }
         }
+        // Menu steps back (unpins) and otherwise does nothing, so a stray press can't close an always-on
+        // display. While Settings is open it is left to the sheet, which dismisses itself.
+        .onExitCommand(perform: showSettings ? nil : { if engine.pinned { engine.unpin() } })
         #endif
         #if os(macOS)
         .sheet(isPresented: $showSettings) { SettingsView(engine: engine).frame(width: 900, height: 800) }

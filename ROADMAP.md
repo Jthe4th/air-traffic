@@ -8,8 +8,6 @@ Shipped work is in [CHANGELOG.md](CHANGELOG.md).
 - **Confirm on a real Apple TV:** remote focus around the strip, gear and zoom buttons, and smoothness on older
   hardware (development has used an Apple TV 4K, 3rd generation).
 - **App icon and Top Shelf image.** The Home screen tile is blank.
-- **Menu button:** ignore Menu on the main screen so an accidental press can't exit an always-on display, keeping
-  Settings and the strip reachable.
 - **Settings polish for the TV:** search as you type with focus moving to the results, and a cleaner layout than
   the default form.
 
@@ -27,13 +25,14 @@ Shipped work is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Before sharing it beyond a personal build
 
-- **Choose a licence.** There is none yet.
 - **Replace the personal photo contact** in the built-in default with a project support address or website.
 - **Review each free service's terms for an app with many users.** OpenStreetMap's tile servers discourage heavy
   use from distributed apps, so a tile provider with its own plan is likely needed. Check adsb.fi, adsb.lol and
   Planespotters too, including how photographers must be credited.
 - **Join the paid Apple Developer Program** to distribute through TestFlight or the App Store. Free-account builds
   only run on your own devices and expire after 7 days.
+- **Revisit the Menu button for App Store review.** Apple's guidelines expect Menu to leave the app from its top
+  screen, and this app currently swallows it. Reviewers may object; an alternative such as a long press may be needed.
 - **Privacy details:** a privacy policy and App Store privacy answers covering the location it uses.
 - **Continuous integration:** run the tests on every push.
 

@@ -9,6 +9,9 @@ Pre-release builds are labelled `-beta`. Apple's bundle version field allows onl
 
 ## [Unreleased]
 
+### Changed
+- Menu on the Siri Remote no longer exits the app from the main screen. It unpins an aircraft you chose and
+  otherwise does nothing; inside Settings it still closes Settings. The TV button still leaves the app.
 ## [1.0.1-beta] - 2026-10-30
 
 First beta. tvOS only, installed from Xcode with a free Apple ID.

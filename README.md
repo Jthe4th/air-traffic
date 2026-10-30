@@ -27,6 +27,8 @@ regenerate the project with `xcodegen generate` (`brew install xcodegen`).
 
 **Remote:** swipe along the bottom strip to pick an aircraft (it stays featured for a minute), Play/Pause
 pins or unpins, otherwise it follows the nearest and rotates through anything inside the overhead zone.
+**Menu** steps back (it unpins an aircraft you chose) and otherwise does nothing, so a stray press can't close the
+display; press the TV button on the remote to leave the app.
 The **+ / −** buttons on the map's right edge (swipe down from the gear) step the view through round radii
 (5, 10, 25, 40, 60 mi, or the metric/nautical equivalents) and remember the choice. Zooming never reloads or
 clears the map; the app already fetches a wider area than it shows.
@@ -78,7 +80,7 @@ telemetry pages. Verified by: tests, compiling OverheadKit/OverheadUI against th
 
 ## What's next
 
-See [ROADMAP.md](ROADMAP.md). Known gaps today: no app icon, Menu exits the app, photos need a contact configured,
+See [ROADMAP.md](ROADMAP.md). Known gaps today: no app icon, photos need a contact configured,
 and remote focus around the newest controls and performance on older Apple TV hardware are unconfirmed.
 
 ## Credits

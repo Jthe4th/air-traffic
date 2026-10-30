@@ -72,6 +72,8 @@ fail (write it, watch it fail, then fix).
 - **Platform gaps:** tvOS has no `scrollContentBackground` and no web view; iOS has no `focusSection`. SwiftUI's
   `Settings` collides with ours, hence `AppSettings`. `ImageRenderer` cannot draw `ScrollView`, so `NearbyStrip`
   uses a plain stack on macOS for previews only.
+- **Menu button:** the main screen deliberately swallows Menu (`onExitCommand` in `TVDashboardView`) so it can't close
+  an always-on display; Settings is left to dismiss itself. This may conflict with App Store review (see ROADMAP).
 - **Focus:** use `FlatButtonStyle` and read `@Environment(\.isFocused)` inside the label, so tvOS's built-in lift
   does not stack on custom focus styling.
 - **Demo traffic** flies a fixed-size loop (`DemoFeed.loopRadiusNM`) so zooming never moves it.
