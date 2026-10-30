@@ -4,10 +4,28 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 and versions follow [Semantic Versioning](https://semver.org/).
 
 Pre-release builds are labelled `-beta`. Apple's bundle version field allows only digits and dots, so the app's
-`CFBundleShortVersionString` holds the number (`1.0.1`) and the label lives in `AT_RELEASE_CHANNEL`
-([project.yml](project.yml)); the app, this file and the git tags show them together (`1.0.1-beta`).
+`CFBundleShortVersionString` holds the number (`1.1.0`) and the label lives in `AT_RELEASE_CHANNEL`
+([project.yml](project.yml)); the app, this file and the git tags show them together (`1.1.0-beta`).
 
 ## [Unreleased]
+
+## [1.1.0-beta] - 2026-10-30
+
+### Added
+- **Always-on display mode.** Controls (gear, zoom, nearby strip) fade after a period without remote input, and the
+  first press afterwards only wakes them. Dimming between 10 PM and 6 AM. A slow few-pixel drift of the whole layout
+  protects OLED panels from burn-in. Settings ▸ Display.
+- **Alerts.** A banner, a pulsing red ring on the map and an EMERGENCY tag for aircraft squawking 7500/7600/7700 or
+  reporting an emergency, and a banner for aircraft flagged as notable. An emergency on the map takes over the aircraft
+  card unless you chose one. Emergencies must persist about 12 seconds so a code being dialled isn't reported.
+- **Provider failover.** If the preferred data provider fails, the other answers in the same update; the preferred one
+  is retried after two minutes. Can be turned off.
+- **Connection diagnostics** in Settings: active provider, last update, response time, aircraft count, request tally
+  and the last error.
+- **App icon and Top Shelf images**, drawn in code (`design-preview --icons`) and built into the asset catalog by
+  `scripts/make-icon-catalog.py`.
+- **Continuous integration** on GitHub Actions: unit tests, tvOS and iOS builds, and an unsigned build of the app.
+- Design-preview scenes `alert` and `ambient`.
 
 ### Fixed
 - The photo area no longer shows an empty box while an aircraft photo loads; the silhouette backdrop stays visible
@@ -72,5 +90,6 @@ First beta. tvOS only, installed from Xcode with a free Apple ID.
 - Free-account builds expire after 7 days and must be reinstalled from Xcode.
 - Remote focus behaviour of the zoom buttons has not yet been confirmed on a real Apple TV.
 
-[Unreleased]: https://github.com/Jthe4th/air-traffic/compare/v1.0.1-beta...HEAD
+[Unreleased]: https://github.com/Jthe4th/air-traffic/compare/v1.1.0-beta...HEAD
+[1.1.0-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.0.1-beta...v1.1.0-beta
 [1.0.1-beta]: https://github.com/Jthe4th/air-traffic/releases/tag/v1.0.1-beta

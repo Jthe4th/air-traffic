@@ -460,6 +460,7 @@ private func aircraft(at p: GeoPoint, track: Double, gs: Double = 400, alt: Int 
 }
 
 // MARK: - Alerts, failover, diagnostics
+
 private func squawking(_ code: String?, emergency: String? = nil, flags: DatabaseFlags = [], ground: Bool = false, hex: String = "e1") -> Aircraft {
     Aircraft(hex: hex, callsign: "TST\(hex)", position: GeoPoint(latitude: 39, longitude: -77), positionTime: Date(), onGround: ground,
              barometricAltitudeFt: ground ? nil : 20_000, groundSpeedKt: 300, trackDeg: 0, squawk: code, emergency: emergency, flags: flags)

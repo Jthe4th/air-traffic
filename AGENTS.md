@@ -39,6 +39,7 @@ swift build --target OverheadUI --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" 
 # Render the UI to images and look at them:
 swift run --scratch-path $S design-preview ./Preview busy quiet nophoto welcome zoomin zoomout crowded photoloading
 
+swift run --scratch-path $S design-preview --icons /tmp/icons && python3 scripts/make-icon-catalog.py /tmp/icons   # after changing AppIconArtwork
 xcodegen generate                                   # after editing project.yml
 xcrun devicectl list devices                        # find the Apple TV's identifier
 xcodebuild -project AirTraffic.xcodeproj -scheme AirTraffic \
@@ -56,8 +57,8 @@ fail (write it, watch it fail, then fix).
 
 ## Things that have already bitten
 
-- **Version:** Apple's version field allows only digits and dots. `MARKETING_VERSION` is `1.0.1` and the `-beta`
-  is `AT_RELEASE_CHANNEL`; `AppVersion.display` joins them. Bump both in `project.yml` and add a changelog entry.
+- **Version:** Apple's version field allows only digits and dots. `MARKETING_VERSION` holds the number (with
+  `CURRENT_PROJECT_VERSION` the build) and the `-beta` is `AT_RELEASE_CHANNEL`; `AppVersion.display` joins them. Bump both in `project.yml` and add a changelog entry.
 - **Personal config:** `Config/Local.xcconfig` holds the photo contact email and the signing team. It is
   git-ignored. Never commit it, and never put personal values in `project.yml`, docs or tests. Regenerating the
   project without a team in `Local.xcconfig` drops signing.
@@ -72,6 +73,15 @@ fail (write it, watch it fail, then fix).
 - **Platform gaps:** tvOS has no `scrollContentBackground` and no web view; iOS has no `focusSection`. SwiftUI's
   `Settings` collides with ours, hence `AppSettings`. `ImageRenderer` cannot draw `ScrollView`, so `NearbyStrip`
   uses a plain stack on macOS for previews only.
+- **Always-on behaviour:** `Ambient` owns idle fading, night dimming and the pixel drift. A press on hidden controls
+  must only wake them (`consumeWakeUp`); remote movement is detected through `UIFocusSystem.didUpdateNotification`.
+- **Alerts:** an emergency must persist `emergencyConfirmAfter` (12 s) before it shows; tests set it to 0.
+- **Failover:** `FailoverFeed` retries the preferred provider after a window; its tests inject a clock. Never treat
+  `CancellationError` as an outage.
+- **Icons:** the Top Shelf images are JPEG (opaque, about a tenth the size); the layered icon stays PNG. Keep the
+  asset catalog small.
+- **CI:** `.github/workflows/ci.yml` mirrors the local commands. It can't be run locally, so after changing it push
+  and watch the run.
 - **Menu button:** the main screen deliberately swallows Menu (`onExitCommand` in `TVDashboardView`) so it can't close
   an always-on display; Settings is left to dismiss itself. This may conflict with App Store review (see ROADMAP).
 - **Focus:** use `FlatButtonStyle` and read `@Environment(\.isFocused)` inside the label, so tvOS's built-in lift

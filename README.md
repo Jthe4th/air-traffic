@@ -1,6 +1,8 @@
 # Air Traffic
 
-**Version 1.0.1-beta** · tvOS · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Notes for contributors and AI agents](AGENTS.md)
+[![CI](https://github.com/Jthe4th/air-traffic/actions/workflows/ci.yml/badge.svg)](https://github.com/Jthe4th/air-traffic/actions/workflows/ci.yml)
+
+**Version 1.1.0-beta** · tvOS · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Notes for contributors and AI agents](AGENTS.md)
 
 A living-room display for Apple TV that shows the aircraft flying near your home: a dark live map, the plane
 that's closest or overhead featured in detail (photo, airline, route, progress, altitude, speed, vertical rate,
@@ -29,6 +31,18 @@ regenerate the project with `xcodegen generate` (`brew install xcodegen`).
 pins or unpins, otherwise it follows the nearest and rotates through anything inside the overhead zone.
 **Menu** steps back (it unpins an aircraft you chose) and otherwise does nothing, so a stray press can't close the
 display; press the TV button on the remote to leave the app.
+
+**Always-on display.** After 15 seconds without remote input the gear, zoom buttons and nearby strip fade away (any
+remote movement brings them back, and the first press after a fade only wakes them). Between 10 PM and 6 AM the screen
+dims, and the whole layout drifts a few pixels over time so a static image can't burn into an OLED panel. All three
+are in Settings ▸ Display.
+
+**Alerts.** An aircraft squawking 7500, 7600 or 7700, or reporting an emergency, gets a banner and a pulsing red ring
+and takes over the aircraft card; aircraft flagged as notable get a banner too (Settings ▸ Data ▸ Alerts). A code must
+hold for about 12 seconds first, because pilots dialling a squawk pass through 7700 briefly.
+
+**Providers.** If adsb.fi (or adsb.lol) fails, the other one answers in the same update, then the preferred one is
+retried after two minutes. Settings ▸ Connection shows which provider is answering, how recently, and any error.
 The **+ / −** buttons on the map's right edge (swipe down from the gear) step the view through round radii
 (5, 10, 25, 40, 60 mi, or the metric/nautical equivalents) and remember the choice. Zooming never reloads or
 clears the map; the app already fetches a wider area than it shows.
@@ -54,7 +68,9 @@ can set `AT_TILE_URL` / `AT_TILE_ATTRIBUTION` to use another map tile server (ad
 Sources/OverheadKit   engine, no UI: feeds, geometry, routes, tracking, reference data   (tvOS/iOS/macOS)
 Sources/OverheadUI    SwiftUI: map, aircraft card, strip, settings                       (tvOS/iOS/macOS)
 Sources/DesignPreview macOS tool that renders the TV layout to PNG
-Apps/tvOS             the app target (just @main + Info.plist)
+Apps/tvOS             the app target (@main, Info.plist, and the icon/Top Shelf asset catalog)
+scripts/              make-icon-catalog.py builds the asset catalog from the rendered icon art
+.github/workflows     CI: unit tests, and tvOS/iOS builds
 Tests/OverheadKitTests  unit tests, including an anonymised adsb.fi capture
 ```
 
@@ -80,7 +96,7 @@ telemetry pages. Verified by: tests, compiling OverheadKit/OverheadUI against th
 
 ## What's next
 
-See [ROADMAP.md](ROADMAP.md). Known gaps today: no app icon, photos need a contact configured,
+See [ROADMAP.md](ROADMAP.md). Known gaps today: photos need a contact configured,
 and remote focus around the newest controls and performance on older Apple TV hardware are unconfirmed.
 
 ## Credits

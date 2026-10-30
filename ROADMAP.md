@@ -7,7 +7,6 @@ Shipped work is in [CHANGELOG.md](CHANGELOG.md).
 
 - **Confirm on a real Apple TV:** remote focus around the strip, gear and zoom buttons, and smoothness on older
   hardware (development has used an Apple TV 4K, 3rd generation).
-- **App icon and Top Shelf image.** The Home screen tile is blank.
 - **Settings polish for the TV:** search as you type with focus moving to the results, and a cleaner layout than
   the default form.
 
@@ -20,7 +19,10 @@ Shipped work is in [CHANGELOG.md](CHANGELOG.md).
   and no rate limits. The feed layer already speaks that format.
 - **Real airline logos,** replacing the brand-coloured letter badges, once licensing is checked.
 - **Broader reference data:** more airlines and aircraft types, and friendlier names for unusual aircraft.
-- **A calmer ambient mode:** dim the screen or fall back to a clock when the sky has been empty for a while.
+- **Quieter map near airports:** option to hide ground traffic labels, and show a barometric altitude below sea level as
+  "near ground" instead of a negative number.
+- **A second route source** for airliners the first has no route for.
+- **Today at a glance:** planes seen, highest, fastest and busiest hour, from the sightings history.
 - **Accessibility and localisation:** VoiceOver labels, larger-text support, translations.
 
 ## Before sharing it beyond a personal build
@@ -34,7 +36,6 @@ Shipped work is in [CHANGELOG.md](CHANGELOG.md).
 - **Revisit the Menu button for App Store review.** Apple's guidelines expect Menu to leave the app from its top
   screen, and this app currently swallows it. Reviewers may object; an alternative such as a long press may be needed.
 - **Privacy details:** a privacy policy and App Store privacy answers covering the location it uses.
-- **Continuous integration:** run the tests on every push.
 
 ## Ideas
 
