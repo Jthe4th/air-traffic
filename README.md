@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Jthe4th/air-traffic/actions/workflows/ci.yml/badge.svg)](https://github.com/Jthe4th/air-traffic/actions/workflows/ci.yml)
 
-**Version 1.1.0-beta** · tvOS · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Notes for contributors and AI agents](AGENTS.md)
+**Version 1.1.1-beta** · tvOS · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Notes for contributors and AI agents](AGENTS.md)
 
 A living-room display for Apple TV that shows the aircraft flying near your home: a dark live map, the plane
 that's closest or overhead featured in detail (photo, airline, route, progress, altitude, speed, vertical rate,

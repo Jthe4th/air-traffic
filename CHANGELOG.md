@@ -4,10 +4,12 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 and versions follow [Semantic Versioning](https://semver.org/).
 
 Pre-release builds are labelled `-beta`. Apple's bundle version field allows only digits and dots, so the app's
-`CFBundleShortVersionString` holds the number (`1.1.0`) and the label lives in `AT_RELEASE_CHANNEL`
-([project.yml](project.yml)); the app, this file and the git tags show them together (`1.1.0-beta`).
+`CFBundleShortVersionString` holds the number (`1.1.1`) and the label lives in `AT_RELEASE_CHANNEL`
+([project.yml](project.yml)); the app, this file and the git tags show them together (`1.1.1-beta`).
 
 ## [Unreleased]
+
+## [1.1.1-beta] - 2026-10-30
 
 ### Added
 - **Close-flyby card.** About 45 seconds before an aircraft passes within a couple of miles (and below 20,000 ft by
@@ -128,6 +130,7 @@ First beta. tvOS only, installed from Xcode with a free Apple ID.
 - Free-account builds expire after 7 days and must be reinstalled from Xcode.
 - Remote focus behaviour of the zoom buttons has not yet been confirmed on a real Apple TV.
 
-[Unreleased]: https://github.com/Jthe4th/air-traffic/compare/v1.1.0-beta...HEAD
+[Unreleased]: https://github.com/Jthe4th/air-traffic/compare/v1.1.1-beta...HEAD
+[1.1.1-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.1.0-beta...v1.1.1-beta
 [1.1.0-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.0.1-beta...v1.1.0-beta
 [1.0.1-beta]: https://github.com/Jthe4th/air-traffic/releases/tag/v1.0.1-beta
