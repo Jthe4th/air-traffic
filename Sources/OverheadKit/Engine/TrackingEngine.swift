@@ -47,6 +47,16 @@ public final class TrackingEngine {
     @ObservationIgnored private var contactTask: Task<Void, Never>?
     @ObservationIgnored private var fetchedRadiusNM = 0.0
     @ObservationIgnored private var emergencySince: [String: Date] = [:]
+    @ObservationIgnored private var flybyActive: [String: (since: Date, lastQualified: Date)] = [:]
+    /// Aircraft that have had their card, until when they are left alone (a plane circling would otherwise keep re-triggering).
+    @ObservationIgnored private var flybyDone: [String: Date] = [:]
+    @ObservationIgnored private var sampleFlyby: (card: FlybyCard, until: Date)?
+    /// The area's pressure setting, kept for a while so a quiet moment doesn't bring the negative altitudes back.
+    @ObservationIgnored private var altimeter: (hPa: Double, at: Date)?
+    /// A card is dropped this long after its aircraft stops qualifying, and never stays longer than `flybyMaxShow`.
+    @ObservationIgnored let flybyLinger: TimeInterval = 6
+    @ObservationIgnored let flybyMaxShow: TimeInterval = 90
+    @ObservationIgnored let flybyCooldown: TimeInterval = 10 * 60
     /// An emergency squawk must hold this long before it is shown; pilots dialling a code pass through 7700 briefly.
     @ObservationIgnored var emergencyConfirmAfter: TimeInterval = 12
     @ObservationIgnored private let injectedRoutes: (any RouteProviding)?
@@ -101,6 +111,32 @@ public final class TrackingEngine {
         }
     }
 
+    /// Cards for aircraft passing close right now: the most imminent first. Also the viewer's sample card, while it lasts.
+    public func flybyCards(at now: Date = Date()) -> [FlybyCard] {
+        if let sample = sampleFlyby {
+            if now < sample.until { return [sample.card] }
+            sampleFlyby = nil
+        }
+        guard let config = settings.flybyConfig else { return [] }
+        let cards: [FlybyCard] = flybyActive.keys.compactMap { id in
+            guard let t = aircraft.first(where: { $0.id == id }),
+                  let pass = Flyby.evaluate(t.aircraft, home: home, heading: settings.viewerHeadingDeg, at: now, config: config.relaxed)
+            else { return nil }
+            let detail = [t.typeName, t.operatorName].compactMap { $0 }.joined(separator: " · ")
+            return FlybyCard(id: id, title: t.flightNumber ?? t.aircraft.title, detail: detail.isEmpty ? nil : detail, pass: pass,
+                             place: pass.look.place(names: settings.directionNames))
+        }
+        return cards.sorted { abs($0.pass.secondsToClosest ?? 0) < abs($1.pass.secondsToClosest ?? 0) }
+    }
+
+    /// Shows a card for a made-up plane due north, so the viewer can check their direction settings against a compass.
+    public func showSampleFlyby(for seconds: TimeInterval = 15, at now: Date = Date()) {
+        let look = LookDirection(bearingDeg: 0, elevationDeg: 45, headingDeg: settings.viewerHeadingDeg, motion: .leftToRight, trackDeg: 90)
+        let pass = FlybyPass(distanceNM: 1, closestNM: 1, secondsToClosest: 20, altitudeFt: 6_000, look: look)
+        sampleFlyby = (FlybyCard(id: "sample", title: "Sample", detail: "Where a plane due north of you would be",
+                                 pass: pass, place: look.place(names: settings.directionNames), isSample: true), now.addingTimeInterval(seconds))
+    }
+
     public var canZoomIn: Bool { MapZoom.zoomedIn(from: settings.mapRadiusNM, units: settings.units) != nil }
     public var canZoomOut: Bool { MapZoom.zoomedOut(from: settings.mapRadiusNM, units: settings.units) != nil }
 
@@ -137,6 +173,9 @@ public final class TrackingEngine {
         aircraft = []
         featuredID = nil
         insideIDs = []
+        flybyActive = [:]
+        flybyDone = [:]
+        altimeter = nil
         status = .starting
         start()
     }
@@ -197,6 +236,7 @@ public final class TrackingEngine {
             let now = Date()
             aircraft.removeAll { now.timeIntervalSince($0.aircraft.positionTime) > 75 }
             updateFeatured(now: now)
+            updateFlybys(now: now)
         }
     }
 
@@ -218,7 +258,10 @@ public final class TrackingEngine {
     // MARK: Ingest
 
     /// Merges a batch of fresh reports. Public so tests and the design preview can drive the engine directly.
-    public func ingest(_ incoming: [Aircraft], at now: Date) {
+    public func ingest(_ reported: [Aircraft], at now: Date) {
+        if let local = Altimetry.localSetting(reported) { altimeter = (local, now) }
+        let setting = altimeter.flatMap { now.timeIntervalSince($0.at) < 30 * 60 ? $0.hPa : nil }
+        let incoming = reported.map { Altimetry.corrected($0, localSetting: setting) }
         let center = home
         let keepWithin = fetchRadiusNM * 1.1
         var previous = Dictionary(uniqueKeysWithValues: aircraft.map { ($0.id, $0) })
@@ -242,6 +285,7 @@ public final class TrackingEngine {
         aircraft = merged
         recordSightings(now: now)
         updateFeatured(now: now)
+        updateFlybys(now: now)
         requestEnrichment(now: now)
     }
 
@@ -308,6 +352,30 @@ public final class TrackingEngine {
         } else {
             featuredID = pool[0].id
             lastCycleSlot = slot
+        }
+    }
+
+    // MARK: Flybys
+
+    /// Decides which aircraft are on show as flybys: one card per pass, kept while the aircraft qualifies, then left alone.
+    func updateFlybys(now: Date) {
+        guard let config = settings.flybyConfig else {
+            if !flybyActive.isEmpty { flybyActive = [:] }
+            return
+        }
+        let center = home
+        flybyDone = flybyDone.filter { $0.value > now }
+        for t in aircraft where flybyDone[t.id] == nil {
+            let active = flybyActive[t.id] != nil
+            guard Flyby.evaluate(t.aircraft, home: center, heading: nil, at: now, config: active ? config.relaxed : config) != nil else { continue }
+            flybyActive[t.id] = (since: flybyActive[t.id]?.since ?? now, lastQualified: now)
+        }
+        for (id, track) in flybyActive {
+            let gone = !aircraft.contains { $0.id == id }
+            if gone || now.timeIntervalSince(track.lastQualified) > flybyLinger || now.timeIntervalSince(track.since) > flybyMaxShow {
+                flybyActive[id] = nil
+                flybyDone[id] = now.addingTimeInterval(flybyCooldown)
+            }
         }
     }
 

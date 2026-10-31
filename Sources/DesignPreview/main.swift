@@ -7,7 +7,7 @@ import OverheadUI
 
 // Renders the TV layout to PNG so the design can be reviewed without a tvOS simulator.
 //   design-preview --icons <dir>                  app icon and Top Shelf images for the asset catalog
-//   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading, alert, ambient (append 2 or 3 for later telemetry pages)
+//   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading, alert, flyby, ambient (append 2 or 3 for later telemetry pages)
 // Needs network access for map tiles on first run (cached afterwards by URLCache).
 
 @MainActor
@@ -35,6 +35,11 @@ func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEn
     if scene == "welcome" { settings.home = nil }
     if scene == "zoomin" { settings.mapRadiusNM = 5 / Geo.milesPerNM }
     if scene == "zoomout" || scene == "crowded" { settings.mapRadiusNM = 60 / Geo.milesPerNM }
+    if scene == "flyby" {
+        // Watching TV while facing south-southwest; the viewer calls the right-hand side "Side door".
+        settings.viewerHeadingDeg = 202.5
+        settings.directionNames.right = "Side door"
+    }
     // "photoloading": the photo's address is known but the image hasn't arrived (this file never exists).
     let imageURL = scene == "photoloading" ? URL(fileURLWithPath: "/nonexistent/photo.png") : photoURL
     let photo = AircraftPhoto(imageURL: imageURL, pageURL: nil, photographer: "Alex Example")
@@ -49,6 +54,12 @@ func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEn
     if scene == "ground" {
         flights = [Aircraft(hex: "g1", callsign: "UAL1348", registration: "N77295", typeCode: "B739", position: engine.home,
                             positionTime: date, onGround: true, groundSpeedKt: 12, trackDeg: 90, wakeClass: .large)]
+    }
+    if scene == "flyby" {
+        // 3 NM west and 1.2 NM north of home, flying east at 300 kt: passes 1.2 NM to the north in about 36 seconds.
+        let p = Geo.destination(from: engine.home, bearing: Geo.normalize(atan2(-3, 1.2) * 180 / .pi), distanceNM: hypot(-3, 1.2))
+        flights.append(Aircraft(hex: "f1b001", callsign: "UAL1348", registration: "N77295", typeCode: "B739", position: p, positionTime: date,
+                                barometricAltitudeFt: 4_500, groundSpeedKt: 300, trackDeg: 90, verticalRateFpm: -700, wakeClass: .large))
     }
     if scene == "alert" {
         // A squawk of 7700 must hold for a few seconds before it is shown, so report it twice.

@@ -9,6 +9,44 @@ Pre-release builds are labelled `-beta`. Apple's bundle version field allows onl
 
 ## [Unreleased]
 
+### Added
+- **Close-flyby card.** About 45 seconds before an aircraft passes within a couple of miles (and below 20,000 ft by
+  default), a card says which way to look from your seat: a plain direction ("Behind you", "On your left") or your own
+  name for that side of the room ("Back door"), how high, and whether it will cross left to right or right to left,
+  with a small sky dial and the flight's details. It stays through the pass and a moment after, and an aircraft gets
+  one card per pass (then a 10-minute cool-down). Settings ▸ Close flybys turns it off and sets what counts as close,
+  the highest altitude, which way you face when watching TV, and the four names.
+- **Exact home location from a street address.** Type your address in Settings ▸ Location and pick the match: the Apple
+  TV looks it up with Apple Maps (the only place it is sent), and only the point and your town are kept, so a house
+  number never shows on screen or in the saved settings. You can also paste coordinates (decimal, with N/S/E/W, or
+  degrees-minutes-seconds). Settings shows how the location was chosen and says when it is only a city or ZIP centre,
+  which can be a mile or more off.
+- **Sample card** (Settings ▸ Close flybys) shows a plane due north of you, to check the direction settings against a
+  compass.
+- Design-preview scene `flyby`. 29 new tests; the left/right, grace-period and cool-down rules were each checked by
+  breaking them and watching a test fail.
+
+### Fixed
+- **Every choice in Settings opened a blank page on the Apple TV** (Map radius, Overhead zone, Units, Hide controls, Aircraft
+  data, Alerts, and the new flyby and direction settings): SwiftUI's built-in picker page never drew inside the Settings
+  screen. Each now opens a list of its own with a checkmark on the current choice and the cursor on it.
+
+- **Negative altitudes** (a plane on a runway reading -400 ft). ADS-B altitude is pressure altitude, measured against a
+  fixed 1013.25 hPa, so near sea level on a high-pressure day it reads below zero. The app now works out the area's
+  pressure setting from what nearby aircraft broadcast (the median of those flying below 12,000 ft, remembered for 30
+  minutes) and corrects altitudes below 17,000 ft with it, so altitudes are above sea level, as a pilot's altimeter shows.
+  Flight levels are untouched, and anything still below zero is shown as zero.
+- **The names for each side of the room lost entries** when typed in a row: the keyboard's Enter key moves on to the next
+  name, and with each keystroke being written straight into the saved settings, names were dropped or cut short. They now
+  have a page of their own (Settings ▸ Close flybys ▸ Names for each side) that holds what you type and saves when a name
+  is finished or the page closes.
+
+### Changed
+- **Location settings have their own page** (Settings ▸ Location ▸ Home location). It opens with where you are
+  watching and how exact that is, then offers the street address as the best way to set it, and the Apple TV's
+  location, a city or ZIP code, and coordinates as labelled alternatives. Saving says so and shows the new status. The
+  main Settings page shows one row, and the Close flybys section points there when the location is only approximate.
+
 ## [1.1.0-beta] - 2026-10-30
 
 ### Added

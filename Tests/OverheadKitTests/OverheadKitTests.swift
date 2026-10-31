@@ -626,5 +626,424 @@ private struct Outage: Error, LocalizedError { var errorDescription: String? { "
         let s = try JSONDecoder().decode(AppSettings.self, from: Data(old.utf8))
         #expect(s.homeName == "Somewhere" && s.units == .metric)
         #expect(s.idleHideSeconds == 15 && s.nightDimming && s.autoFailover && s.alertLevel == .emergencyAndNotable)
+        #expect(s.flybyCards && s.flybyMaxAltitudeFt == 20_000 && s.viewerHeadingDeg == nil && s.homeSource == nil)
+        #expect(s.directionNames == DirectionNames())
+    }
+
+    @Test func flybySettingsSurviveASaveAndLoad() throws {
+        var s = AppSettings()
+        s.homeSource = .coordinates; s.viewerHeadingDeg = 202.5; s.flybyCards = false
+        s.flybyDistanceNM = 3; s.flybyMaxAltitudeFt = 0; s.directionNames.left = "Side door"
+        let back = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(s))
+        #expect(back == s)
+        #expect(back.homeSource?.isApproximate == false && HomeSource.place.isApproximate && HomeSource.device.isApproximate)
+    }
+}
+
+@Suite struct CoordinateTests {
+    @Test func readsDecimalDegrees() throws {
+        let p = try #require(Coordinates.parse("37.3349, -122.0090"))
+        #expect(abs(p.latitude - 37.3349) < 1e-9 && abs(p.longitude + 122.0090) < 1e-9)
+        #expect(Coordinates.parse("37.3349 -122.0090") != nil)
+        #expect(Coordinates.parse("  37.3349,-122.0090  ") != nil)
+    }
+
+    @Test func readsHemisphereLetters() throws {
+        let west = try #require(Coordinates.parse("37.3349 N, 122.0090 W"))
+        #expect(west.latitude > 0 && west.longitude < 0)
+        let south = try #require(Coordinates.parse("33.8688°S 151.2093°E"))
+        #expect(south.latitude < 0 && south.longitude > 0)
+    }
+
+    @Test func readsDegreesMinutesSeconds() throws {
+        let p = try #require(Coordinates.parse("37°20'06\"N 122°00'32\"W"))
+        #expect(abs(p.latitude - (37 + 20.0 / 60 + 6.0 / 3600)) < 1e-6)
+        #expect(abs(p.longitude + (122 + 0.0 / 60 + 32.0 / 3600)) < 1e-6)
+        let minutesOnly = try #require(Coordinates.parse("37 20.1 N 122 0.5 W"))
+        #expect(abs(minutesOnly.latitude - 37.335) < 1e-6 && abs(minutesOnly.longitude + (122 + 0.5 / 60)) < 1e-6)
+    }
+
+    @Test func rejectsAnythingElse() {
+        for text in ["", "hello", "37.3349", "37.3349, -122.0090, 12", "North 37 West 122", "95, 20", "37, 200", "37°75'00\"N 122°00'00\"W"] {
+            #expect(Coordinates.parse(text) == nil, "should reject \(text)")
+        }
+    }
+
+    @Test func formatsFourDecimals() {
+        #expect(Coordinates.format(GeoPoint(latitude: 37.3349, longitude: -122.0090)) == "37.3349°, -122.0090°")
+    }
+}
+
+@Suite struct AddressMatchTests {
+    private func match(_ address: String, lat: Double = 37.33, lon: Double = -122.0) -> AddressMatch {
+        AddressMatch(address: address, placeName: "Town, MD", location: GeoPoint(latitude: lat, longitude: lon))
+    }
+
+    @Test func multiLineAddressesBecomeOneTidyLine() {
+        #expect(AddressMatch.singleLine("1 Apple Park Way\nCupertino, CA  95014\nUnited States") == "1 Apple Park Way, Cupertino, CA 95014, United States")
+        #expect(AddressMatch.singleLine("  \n  ") == "")
+        #expect(AddressMatch.singleLine("123 Main St, Springfield, IL") == "123 Main St, Springfield, IL")
+    }
+
+    @Test func unusableAndRepeatedMatchesAreDropped() {
+        let list = [match("A"), match("A"), match("B", lat: 89, lon: 0), match("", lat: 39, lon: -76), match("C", lat: 40, lon: -77)]
+        #expect(AddressMatch.usable(list).map(\.address) == ["A", "C"])
+    }
+
+    @Test func theListIsCapped() {
+        let many = (0..<9).map { match("Street \($0)", lat: 39 + Double($0) / 100) }
+        #expect(AddressMatch.usable(many).count == 5)
+        #expect(AddressMatch.usable(many, limit: 2).map(\.address) == ["Street 0", "Street 1"])
+    }
+
+    @Test func aStreetAddressCountsAsExactButACityOrTheTVsLocationDoesNot() {
+        #expect(!HomeSource.address.isApproximate && !HomeSource.coordinates.isApproximate)
+        #expect(HomeSource.place.isApproximate && HomeSource.device.isApproximate)
+    }
+}
+
+@Suite struct LookTests {
+    private func sector(_ bearing: Double, facing: Double) -> Sector? {
+        LookDirection(bearingDeg: bearing, elevationDeg: 30, headingDeg: facing).sector
+    }
+
+    @Test func quartersFollowTheWayTheViewerFaces() {
+        // Facing east: east is ahead, north is on the left, south on the right, west behind.
+        #expect(sector(90, facing: 90) == .ahead)
+        #expect(sector(0, facing: 90) == .left)
+        #expect(sector(180, facing: 90) == .right)
+        #expect(sector(270, facing: 90) == .behind)
+    }
+
+    @Test func quartersWrapAroundNorth() throws {
+        let look = LookDirection(bearingDeg: 10, elevationDeg: 20, headingDeg: 350)
+        #expect(abs(try #require(look.relativeDeg) - 20) < 1e-9)
+        #expect(look.sector == .ahead)
+        #expect(sector(170, facing: 350) == .behind)
+        #expect(abs(try #require(LookDirection(bearingDeg: 350, elevationDeg: 20, headingDeg: 10).relativeDeg) + 20) < 1e-9)
+    }
+
+    @Test func theViewersOwnNamesWin() {
+        var names = DirectionNames()
+        let behind = LookDirection(bearingDeg: 270, elevationDeg: 30, headingDeg: 90)
+        #expect(behind.place(names: names) == "Behind you")
+        names.behind = "  back door "
+        #expect(behind.place(names: names) == "Back door")
+        #expect(LookDirection(bearingDeg: 0, elevationDeg: 30, headingDeg: 90).place(names: names) == "On your left")
+    }
+
+    @Test func withoutAFacingItFallsBackToCompassPoints() {
+        #expect(LookDirection(bearingDeg: 315, elevationDeg: 30).place() == "To the northwest")
+        #expect(LookDirection(bearingDeg: 200, elevationDeg: 30).place() == "To the south-southwest")
+        #expect(LookDirection(bearingDeg: 10, elevationDeg: 30).relativeDeg == nil)
+    }
+
+    @Test func nearTheZenithDirectionStopsMattering() {
+        let up = LookDirection(bearingDeg: 123, elevationDeg: 84, headingDeg: 0)
+        #expect(up.isOverhead && up.place() == "Almost straight overhead" && up.height == nil)
+        #expect(LookDirection(bearingDeg: 123, elevationDeg: 60, headingDeg: 0).height == "high up")
+        #expect(LookDirection(bearingDeg: 123, elevationDeg: 5).height == "right at the horizon")
+        #expect(LookDirection(bearingDeg: 123, elevationDeg: 20).height == "low in the sky")
+        #expect(LookDirection(bearingDeg: 123, elevationDeg: 40).height == "partway up")
+    }
+
+    @Test func motionFollowsWhichSideTheTrackPassesOn() {
+        // A plane north-west of you flying east passes to your north: its bearing grows, so it crosses left to right.
+        #expect(PassMotion.predict(east: -5, north: 1, trackDeg: 90) == .leftToRight)
+        #expect(PassMotion.predict(east: 5, north: 1, trackDeg: 270) == .rightToLeft)
+        // Passing to your south reverses it.
+        #expect(PassMotion.predict(east: -5, north: -1, trackDeg: 90) == .rightToLeft)
+        #expect(PassMotion.predict(east: 5, north: -1, trackDeg: 270) == .leftToRight)
+        guard case .overhead(let heading) = PassMotion.predict(east: 0, north: 5, trackDeg: 180) else {
+            Issue.record("a track through the viewer should be an overhead pass"); return
+        }
+        #expect(heading == 180)
+    }
+
+    @Test func motionIsDescribedInWords() {
+        #expect(LookDirection(bearingDeg: 0, elevationDeg: 30, motion: .leftToRight).motionText == "moving left to right")
+        #expect(LookDirection(bearingDeg: 0, elevationDeg: 30, motion: .rightToLeft).motionText == "moving right to left")
+        #expect(LookDirection(bearingDeg: 0, elevationDeg: 30, motion: .overhead(headingDeg: 225)).motionText == "heading southwest")
+        #expect(LookDirection(bearingDeg: 0, elevationDeg: 30).motionText == nil)
+    }
+}
+
+@Suite struct FlybyTests {
+    private let home = GeoPoint(latitude: 40.0, longitude: -105.0)
+    private let config = FlybyConfig(distanceNM: 2 / Geo.milesPerNM, maxAltitudeFt: 20_000)
+
+    /// An aircraft `east`/`north` NM from home, reported at `now`.
+    private func plane(east: Double, north: Double, track: Double, gs: Double = 300, alt: Int? = 6_000, ground: Bool = false, now: Date) -> Aircraft {
+        let p = Geo.destination(from: home, bearing: Geo.normalize(Geo.deg(atan2(east, north))), distanceNM: hypot(east, north))
+        return Aircraft(hex: "fly001", callsign: "TST100", position: p, positionTime: now, onGround: ground,
+                        barometricAltitudeFt: alt, groundSpeedKt: gs, trackDeg: track)
+    }
+
+    @Test func aPlaneAboutToCrossOverheadQualifies() throws {
+        let now = Date()
+        let pass = try #require(Flyby.evaluate(plane(east: 0, north: 3, track: 180, now: now), home: home, heading: nil, at: now, config: config))
+        #expect(abs(try #require(pass.secondsToClosest) - 36) < 1)      // 3 NM at 300 kt
+        #expect(try #require(pass.closestNM) < 0.05)
+        #expect(abs(pass.look.bearingDeg) < 1 || abs(pass.look.bearingDeg - 360) < 1)
+        #expect(pass.look.elevationDeg > 10 && pass.look.elevationDeg < 30)      // 6,000 ft at 3 NM
+        guard case .overhead = pass.look.motion else { Issue.record("expected an overhead pass"); return }
+    }
+
+    @Test func aPassOffToOneSideReportsWhichWayItCrosses() throws {
+        let now = Date()
+        let pass = try #require(Flyby.evaluate(plane(east: -3, north: 1, track: 90, now: now), home: home, heading: nil, at: now, config: config))
+        #expect(abs(try #require(pass.closestNM) - 1) < 0.05)
+        #expect(pass.look.motion == .leftToRight)
+    }
+
+    @Test func tooWideTooEarlyOrTooLateIsIgnored() {
+        let now = Date()
+        func qualifies(_ a: Aircraft) -> Bool { Flyby.evaluate(a, home: home, heading: nil, at: now, config: config) != nil }
+        #expect(!qualifies(plane(east: 5, north: 3, track: 180, now: now)))      // passes 5 NM to the east
+        #expect(!qualifies(plane(east: 0, north: 10, track: 180, now: now)))     // two minutes out
+        #expect(!qualifies(plane(east: 0, north: -5, track: 180, now: now)))     // already a minute past
+        #expect(qualifies(plane(east: 0, north: -1, track: 180, now: now)))      // just passed: still worth a look
+    }
+
+    @Test func highFlyersCanBeIgnored() {
+        let now = Date()
+        let high = plane(east: 0, north: 3, track: 180, alt: 35_000, now: now)
+        #expect(Flyby.evaluate(high, home: home, heading: nil, at: now, config: config) == nil)
+        var anyAltitude = config; anyAltitude.maxAltitudeFt = 0
+        #expect(Flyby.evaluate(high, home: home, heading: nil, at: now, config: anyAltitude) != nil)
+    }
+
+    @Test func groundTrafficAndUnknownAltitudeAreIgnored() {
+        let now = Date()
+        #expect(Flyby.evaluate(plane(east: 0, north: 1, track: 180, gs: 10, alt: 0, ground: true, now: now), home: home, heading: nil, at: now, config: config) == nil)
+        #expect(Flyby.evaluate(plane(east: 0, north: 3, track: 180, alt: nil, now: now), home: home, heading: nil, at: now, config: config) == nil)
+    }
+
+    @Test func aHoveringHelicopterCountsWhileItIsClose() throws {
+        let now = Date()
+        let near = try #require(Flyby.evaluate(plane(east: 0, north: 1, track: 0, gs: 0, alt: 800, now: now), home: home, heading: nil, at: now, config: config))
+        #expect(near.secondsToClosest == nil && near.look.motion == nil)
+        #expect(Flyby.evaluate(plane(east: 0, north: 3, track: 0, gs: 0, alt: 800, now: now), home: home, heading: nil, at: now, config: config) == nil)
+    }
+
+    @Test func theCardNamesTheDirectionToLook() throws {
+        let now = Date()
+        // Facing south, a plane to the north is behind you. The viewer calls that side the front door.
+        var names = DirectionNames(); names.behind = "front door"
+        let pass = try #require(Flyby.evaluate(plane(east: 0, north: 3, track: 180, now: now), home: home, heading: 180, at: now, config: config))
+        let card = FlybyCard(id: "x", title: "TST100", detail: nil, pass: pass, place: pass.look.place(names: names))
+        #expect(card.place == "Front door")
+        #expect(card.headline == "Passing close in about 35 seconds")
+        #expect(card.directionDetail.contains("heading south"))
+    }
+
+    @Test func headlinesTrackThePhaseOfThePass() {
+        func headline(_ seconds: Double?) -> String {
+            let pass = FlybyPass(distanceNM: 1, closestNM: 1, secondsToClosest: seconds, altitudeFt: 5_000, look: LookDirection(bearingDeg: 0, elevationDeg: 40))
+            return FlybyCard(id: "x", title: "T", detail: nil, pass: pass, place: "").headline
+        }
+        #expect(headline(20) == "Passing close in about 20 seconds")
+        #expect(headline(2) == "Passing close now")
+        #expect(headline(-3) == "Passing close now")
+        #expect(headline(-10) == "Just passed")
+        #expect(headline(nil) == "Close by")
+    }
+}
+
+@MainActor
+@Suite struct EngineFlybyTests {
+    private func engine(_ change: (inout AppSettings) -> Void = { _ in }) -> TrackingEngine {
+        var s = AppSettings(); change(&s)
+        return TrackingEngine(settings: s, persists: false)
+    }
+
+    /// A plane `north` NM north of home flying due south at 300 kt (36 s from overhead at 3 NM).
+    private func inbound(north: Double, home: GeoPoint, now: Date, alt: Int = 6_000) -> Aircraft {
+        Aircraft(hex: "fly001", callsign: "TST100", position: Geo.destination(from: home, bearing: 0, distanceNM: north), positionTime: now,
+                 barometricAltitudeFt: alt, groundSpeedKt: 300, trackDeg: 180)
+    }
+
+    @Test func aCardAppearsForAnInboundPlaneAndLingersJustAfterThePass() {
+        let e = engine(), t0 = Date()
+        e.ingest([inbound(north: 3, home: e.home, now: t0)], at: t0)
+        #expect(e.flybyCards(at: t0).map(\.id) == ["fly001"])
+        #expect(e.flybyCards(at: t0.addingTimeInterval(38)).first?.phase == .passing)       // overhead about now
+        #expect(e.flybyCards(at: t0.addingTimeInterval(50)).first?.phase == .passed)
+    }
+
+    @Test func nothingShowsForAPlaneThatIsStillFarOff() {
+        let e = engine(), t0 = Date()
+        e.ingest([inbound(north: 10, home: e.home, now: t0)], at: t0)
+        #expect(e.flybyCards(at: t0).isEmpty)
+        // …until it is within the lead time (3.5 NM at 300 kt is 42 s out).
+        let later = t0.addingTimeInterval(60)
+        e.ingest([inbound(north: 3.5, home: e.home, now: later)], at: later)
+        #expect(e.flybyCards(at: later).count == 1)
+    }
+
+    @Test func eachPassGetsOneCardThenTheAircraftIsLeftAlone() {
+        let e = engine(), t0 = Date()
+        e.ingest([inbound(north: 3, home: e.home, now: t0)], at: t0)
+        #expect(e.flybyCards(at: t0).count == 1)
+
+        // Well past: the card retires…
+        let after = t0.addingTimeInterval(80)
+        e.ingest([Aircraft(hex: "fly001", callsign: "TST100", position: Geo.destination(from: e.home, bearing: 180, distanceNM: 6), positionTime: after,
+                           barometricAltitudeFt: 6_000, groundSpeedKt: 300, trackDeg: 180)], at: after)
+        #expect(e.flybyCards(at: after).isEmpty)
+
+        // …and the same aircraft coming back round a minute later does not get another.
+        let again = after.addingTimeInterval(60)
+        e.ingest([inbound(north: 3, home: e.home, now: again)], at: again)
+        #expect(e.flybyCards(at: again).isEmpty)
+
+        // After the cool-down it can.
+        let muchLater = after.addingTimeInterval(e.flybyCooldown + 5)
+        e.ingest([inbound(north: 3, home: e.home, now: muchLater)], at: muchLater)
+        #expect(e.flybyCards(at: muchLater).count == 1)
+    }
+
+    @Test func aCardNeverStaysUpForeverForAnAircraftThatKeepsQualifying() {
+        let e = engine(), t0 = Date()
+        let hover = { (now: Date) in Aircraft(hex: "heli01", callsign: "N911", position: Geo.destination(from: e.home, bearing: 90, distanceNM: 0.6), positionTime: now,
+                                              barometricAltitudeFt: 600, groundSpeedKt: 0, trackDeg: 0) }
+        e.ingest([hover(t0)], at: t0)
+        #expect(e.flybyCards(at: t0).count == 1)
+        let later = t0.addingTimeInterval(e.flybyMaxShow + 5)
+        e.ingest([hover(later)], at: later)
+        #expect(e.flybyCards(at: later).isEmpty)
+    }
+
+    @Test func theCardCanBeTurnedOff() {
+        let e = engine { $0.flybyCards = false }, t0 = Date()
+        e.ingest([inbound(north: 3, home: e.home, now: t0)], at: t0)
+        #expect(e.flybyCards(at: t0).isEmpty)
+    }
+
+    @Test func settingsChangeWhatCounts() {
+        let e = engine { $0.flybyMaxAltitudeFt = 5_000 }, t0 = Date()
+        e.ingest([inbound(north: 3, home: e.home, now: t0, alt: 6_000)], at: t0)
+        #expect(e.flybyCards(at: t0).isEmpty)
+        e.settings.flybyMaxAltitudeFt = 0
+        #expect(e.flybyCards(at: t0).isEmpty)                         // a card is only opened by the next report or tick
+        e.ingest([inbound(north: 3, home: e.home, now: t0, alt: 6_000)], at: t0)
+        #expect(e.flybyCards(at: t0).count == 1)
+    }
+
+    @Test func theViewersFacingAndNamesShapeTheCard() {
+        let e = engine { $0.viewerHeadingDeg = 180; $0.directionNames.behind = "front door" }, t0 = Date()
+        e.ingest([inbound(north: 3, home: e.home, now: t0)], at: t0)
+        // Facing south, a plane to the north is behind the viewer.
+        #expect(e.flybyCards(at: t0).first?.place == "Front door")
+        e.settings.directionNames.behind = ""
+        #expect(e.flybyCards(at: t0).first?.place == "Behind you")
+        e.settings.viewerHeadingDeg = nil
+        #expect(e.flybyCards(at: t0).first?.place == "To the north")
+    }
+
+    @Test func theSampleCardPointsDueNorthAndExpires() {
+        let e = engine { $0.viewerHeadingDeg = 0 }, t0 = Date()
+        e.showSampleFlyby(for: 10, at: t0)
+        let card = e.flybyCards(at: t0.addingTimeInterval(1)).first
+        #expect(card?.isSample == true && card?.place == "Ahead of you")        // facing north, north is ahead
+        #expect(e.flybyCards(at: t0.addingTimeInterval(11)).isEmpty)
+    }
+}
+
+@Suite struct AltimetryTests {
+    @Test func standardPressureChangesNothing() {
+        #expect(abs(Altimetry.indicatedAltitudeFt(pressureAltitudeFt: 5_000, qnhHPa: Altimetry.standardHPa) - 5_000) < 0.5)
+        #expect(abs(Altimetry.indicatedAltitudeFt(pressureAltitudeFt: -300, qnhHPa: Altimetry.standardHPa) + 300) < 0.5)
+    }
+
+    @Test func highPressureLiftsAPlaneThatReadsBelowSeaLevel() {
+        // 1020.8 hPa (30.14 inHg) is 7.55 hPa above standard: about 27 ft per hPa near the surface.
+        #expect(abs(Altimetry.indicatedAltitudeFt(pressureAltitudeFt: 0, qnhHPa: 1020.8) - 205) < 5)
+        // A strong high, 1030 hPa: a plane on a runway 146 ft above sea level reads about -300 ft of pressure altitude.
+        let onTheRunway = Altimetry.indicatedAltitudeFt(pressureAltitudeFt: -300, qnhHPa: 1030)
+        #expect(abs(onTheRunway - 146) < 25)
+    }
+
+    @Test func lowPressureLowersIt() {
+        #expect(Altimetry.indicatedAltitudeFt(pressureAltitudeFt: 3_000, qnhHPa: 1000) < 3_000 - 300)
+    }
+
+    @Test func theLocalSettingIsTheMedianOfWhatLowAircraftReport() {
+        let t = Date(), p = GeoPoint(latitude: 39, longitude: -77)
+        func plane(_ id: String, baro: Int, qnh: Double?, ground: Bool = false) -> Aircraft {
+            Aircraft(hex: id, position: p, positionTime: t, onGround: ground, barometricAltitudeFt: baro, altimeterSettingHPa: qnh)
+        }
+        let list = [plane("a", baro: 3_000, qnh: 1029), plane("b", baro: 5_000, qnh: 1030), plane("c", baro: 8_000, qnh: 1031),
+                    plane("high", baro: 35_000, qnh: 1013.2),          // flight levels are always 1013.25: not the weather
+                    plane("junk", baro: 2_000, qnh: 12),               // implausible
+                    plane("ground", baro: 0, qnh: 1040, ground: true), plane("none", baro: 4_000, qnh: nil)]
+        #expect(Altimetry.localSetting(list) == 1030)
+        #expect(Altimetry.localSetting([plane("only high", baro: 35_000, qnh: 1013.2)]) == nil)
+    }
+
+    @Test func decodesTheSelectedPressureFromARealCapture() throws {
+        let url = try #require(Bundle.module.url(forResource: "adsbfi-sample", withExtension: "json", subdirectory: "Fixtures"))
+        let list = try ReadsbDecoder.decode(Data(contentsOf: url), fallbackNow: Date())
+        #expect(list.contains { $0.altimeterSettingHPa == 1020.8 })
+        #expect(list.filter { $0.altimeterSettingHPa != nil }.count == 5)
+    }
+
+    @Test func altitudeIsNeverNegative() {
+        let p = GeoPoint(latitude: 39, longitude: -77)
+        var a = Aircraft(hex: "neg", position: p, positionTime: Date(), barometricAltitudeFt: -420)
+        #expect(a.altitudeFt == 0)
+        a.qnhCorrectionFt = 300
+        #expect(a.altitudeFt == 0)                                       // still below zero after correcting
+        a.qnhCorrectionFt = 500
+        #expect(a.altitudeFt == 80)
+        #expect(Aircraft(hex: "g", position: p, positionTime: Date(), geometricAltitudeFt: -90).altitudeFt == 0)
+    }
+}
+
+@MainActor
+@Suite struct EngineAltitudeTests {
+    private func plane(_ id: String, baro: Int, qnh: Double? = nil, home: GeoPoint, now: Date, bearing: Double = 30) -> Aircraft {
+        Aircraft(hex: id, callsign: id.uppercased(), position: Geo.destination(from: home, bearing: bearing, distanceNM: 8), positionTime: now,
+                 barometricAltitudeFt: baro, groundSpeedKt: 150, trackDeg: 0, altimeterSettingHPa: qnh)
+    }
+
+    private func altitude(_ id: String, in engine: TrackingEngine) -> Int? {
+        engine.aircraft.first { $0.id == id }?.aircraft.altitudeFt
+    }
+
+    @Test func belowSeaLevelReadingsAreCorrectedFromNearbyTrafficsPressureSetting() {
+        let e = TrackingEngine(settings: AppSettings(), persists: false), t0 = Date(), home = e.home
+        e.ingest([plane("low", baro: -300, home: home, now: t0),                                   // reports no setting of its own
+                  plane("b", baro: 4_000, qnh: 1030, home: home, now: t0, bearing: 90),
+                  plane("c", baro: 6_000, qnh: 1030, home: home, now: t0, bearing: 150),
+                  plane("fl", baro: 35_000, home: home, now: t0, bearing: 210)], at: t0)
+        let low = altitude("low", in: e) ?? -1
+        #expect(low > 100 && low < 200)                                                           // about 150 ft, a runway near sea level
+        #expect((altitude("b", in: e) ?? 0) > 4_300)
+        #expect(altitude("fl", in: e) == 35_000)                                                   // flight levels are left alone
+    }
+
+    @Test func withNoPressureSettingAnywhereItShowsZeroNeverNegative() {
+        let e = TrackingEngine(settings: AppSettings(), persists: false), t0 = Date()
+        e.ingest([plane("low", baro: -400, home: e.home, now: t0)], at: t0)
+        #expect(altitude("low", in: e) == 0)
+    }
+
+    @Test func aPlanesOwnSettingIsUsedWhenNoOneElseReportsOne() {
+        // The area median needs low aircraft; an aircraft above 12,000 ft still corrects itself if it is low enough to matter.
+        let e = TrackingEngine(settings: AppSettings(), persists: false), t0 = Date()
+        e.ingest([plane("alone", baro: 13_000, qnh: 1030, home: e.home, now: t0)], at: t0)
+        #expect((altitude("alone", in: e) ?? 0) > 13_400)
+    }
+
+    @Test func theSettingIsRememberedThroughAQuietSpellButNotForever() {
+        let e = TrackingEngine(settings: AppSettings(), persists: false), t0 = Date(), home = e.home
+        e.ingest([plane("a", baro: 4_000, qnh: 1030, home: home, now: t0)], at: t0)
+        let later = t0.addingTimeInterval(10 * 60)
+        e.ingest([plane("low", baro: -300, home: home, now: later)], at: later)
+        #expect((altitude("low", in: e) ?? 0) > 100)                                               // corrected from what was seen ten minutes ago
+        let muchLater = t0.addingTimeInterval(45 * 60)
+        e.ingest([plane("low", baro: -300, home: home, now: muchLater)], at: muchLater)
+        #expect(altitude("low", in: e) == 0)                                                       // too stale to trust
     }
 }

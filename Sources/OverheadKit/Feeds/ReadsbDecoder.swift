@@ -74,6 +74,7 @@ public enum ReadsbDecoder {
         var mag_heading: Double?
         var roll: Double?
         var nav_altitude_mcp: Double?
+        var nav_qnh: Double?
         var nav_altitude_fms: Double?
         var nav_heading: Double?
         var nav_modes: [String]?
@@ -134,7 +135,8 @@ public enum ReadsbDecoder {
                 windDirectionDeg: wd,
                 windSpeedKt: ws,
                 outsideAirTempC: oat,
-                sourceType: type
+                sourceType: type,
+                altimeterSettingHPa: nav_qnh
             )
         }
     }

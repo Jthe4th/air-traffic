@@ -22,7 +22,7 @@ No Home Assistant, no server, no paid Apple developer account needed.
    **Window ▸ Devices and Simulators ▸ +** and enter the code. Both must be on the same network.
 4. Choose the Apple TV as the run destination and press Run.
 5. First launch shows demo traffic. Open the gear (swipe up from the aircraft strip) and set your location by
-   ZIP/city, or use the Apple TV's own location.
+   street address, ZIP/city, coordinates, or the Apple TV's own location.
 
 Free-account builds expire after 7 days; run again from Xcode to refresh. If you change `project.yml`,
 regenerate the project with `xcodegen generate` (`brew install xcodegen`).
@@ -40,6 +40,15 @@ are in Settings ▸ Display.
 **Alerts.** An aircraft squawking 7500, 7600 or 7700, or reporting an emergency, gets a banner and a pulsing red ring
 and takes over the aircraft card; aircraft flagged as notable get a banner too (Settings ▸ Data ▸ Alerts). A code must
 hold for about 12 seconds first, because pilots dialling a squawk pass through 7700 briefly.
+
+**Close flybys.** When an aircraft is about to pass within a couple of miles (below 20,000 ft by default), a card
+appears about 45 seconds ahead saying which way to look: "Behind you · high up · moving left to right", with a small sky
+dial. In Settings ▸ Close flybys say which way you face when you watch TV (from your seat toward the screen); then
+"ahead" is past the TV and "behind" is behind your seat. You can name each side after a door or window ("Back door").
+For directions that are right to within a house, enter your street address under Settings ▸ Location (it is looked up with
+Apple Maps, and only the point and your town are kept): a ZIP or city search lands in the middle of town. Coordinates
+can be pasted instead. **Show a sample card** puts a plane due north on screen so you can check the
+settings against a compass app.
 
 **Providers.** If adsb.fi (or adsb.lol) fails, the other one answers in the same update, then the preferred one is
 retried after two minutes. Settings ▸ Connection shows which provider is answering, how recently, and any error.
@@ -74,7 +83,8 @@ scripts/              make-icon-catalog.py builds the asset catalog from the ren
 Tests/OverheadKitTests  unit tests, including an anonymised adsb.fi capture
 ```
 
-- **Positions:** adsb.fi (or adsb.lol) every 5 s; planes glide between updates by dead reckoning.
+- **Positions:** adsb.fi (or adsb.lol) every 5 s; planes glide between updates by dead reckoning. Altitudes are above
+  sea level: the pressure altitude aircraft report is corrected with the pressure setting nearby aircraft broadcast.
   Providers only ever see your location rounded to ~0.7 mi.
 - **Routes:** ADSB.lol standing data per callsign, shown only if the plane's position and heading actually fit
   the route. Callsigns get reused (the database says UAL2850 is SFO→ONT even when it's flying near Dulles),

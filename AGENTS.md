@@ -48,6 +48,11 @@ xcodebuild -project AirTraffic.xcodeproj -scheme AirTraffic \
 
 Install and launch with `xcrun devicectl device install app` and `... process launch com.feezerj.AirTraffic`.
 
+The tvOS 27 simulator runs the app, which is how to check anything the preview cannot draw (settings pages, pickers, focus):
+build with `-sdk appletvsimulator -destination 'platform=tvOS Simulator,id=<SIM_ID>'`, then `xcrun simctl boot/install/launch`,
+and drive it with the iOS Simulator control tool (`attach`, `press_key` for arrows and return, `screenshot`). Wait a couple of
+seconds between presses: a press that lands during a transition is lost. Don't use Device Hub for this (see below).
+
 ## Verification expectations
 
 Type-checking and tests prove correctness, not that the UI looks right. After a UI change, render the relevant
@@ -86,6 +91,22 @@ fail (write it, watch it fail, then fix).
   two thin red lines across the top and bottom of the screen. They are a system overlay, absent from
   `devicectl device capture screenshot`, and they survive closing the window and rebooting the TV. Quit the whole app
   when you are done. Prefer `devicectl` (install, launch, capture screenshot) where it can answer the question.
+- **Flybys:** `viewerHeadingDeg` is the direction the viewer *looks* when watching (seat toward the screen), not the way
+  the screen faces; "ahead" is past the TV. "Left to right" always means the aircraft's compass bearing is increasing
+  (`PassMotion`). Home from a city or ZIP search is only a place centre (`HomeSource.place`), so exact directions need a
+  street address or coordinates. Address lookup is MapKit's `MKLocalSearch` (`AddressSearch`, in OverheadUI): it returns
+  something even for nonsense, so the viewer confirms from a list, and the street address is never stored or shown
+  (`AddressMatch`: only the point and the town name are kept). One card per pass with a 10-minute cool-down. The left/right, grace-period and cool-down rules were each
+  checked by breaking them and watching a test fail.
+- **Pickers:** SwiftUI's `Picker` comes up blank on tvOS inside the Settings screen (found on the real TV, not in any
+  preview). Use `ChoiceRow`, which pushes a list page of its own.
+- **Text fields:** the tvOS keyboard is a screen of its own, and its Enter key reads "next" and jumps to the next text field
+  in the form. Don't bind a `TextField` straight to `engine.settings` (every keystroke redraws Settings under the keyboard),
+  and don't reload a page's values in `onAppear` (the page "reappears" after each field and overwrites what was typed).
+  Hold the text in local `@State` read once in `init`, and commit on `onSubmit` and `onDisappear` (`DirectionNamesView`).
+- **Altitude:** `barometricAltitudeFt` is *pressure* altitude (1013.25 hPa), which reads below zero near sea level on a
+  high-pressure day. `Aircraft.altitudeFt` is the corrected, never-negative number; the engine sets `qnhCorrectionFt` at
+  ingest from the median `nav_qnh` of low aircraft (`Altimetry`). Use `altitudeFt`, never the raw field, for display.
 - **Menu button:** the main screen deliberately swallows Menu (`onExitCommand` in `TVDashboardView`) so it can't close
   an always-on display; Settings is left to dismiss itself. This may conflict with App Store review (see ROADMAP).
 - **Focus:** use `FlatButtonStyle` and read `@Environment(\.isFocused)` inside the label, so tvOS's built-in lift

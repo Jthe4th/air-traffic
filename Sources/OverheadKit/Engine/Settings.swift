@@ -1,8 +1,16 @@
 import Foundation
 
+/// How the home location was chosen. A city or ZIP search lands on the middle of the place, which can be a mile or more away.
+public enum HomeSource: String, Codable, Sendable {
+    case place, device, coordinates, address
+
+    public var isApproximate: Bool { self == .place || self == .device }
+}
+
 public struct AppSettings: Codable, Equatable, Sendable {
     public var home: GeoPoint?
     public var homeName: String?
+    public var homeSource: HomeSource?
     /// Radius of the map and of the feed query.
     public var mapRadiusNM: Double = 25 / Geo.milesPerNM
     /// Aircraft inside this radius are "overhead": featured, listed as sightings.
@@ -22,12 +30,22 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var alertLevel: AlertLevel = .emergencyAndNotable
     /// Fall back to the other data provider when the preferred one fails.
     public var autoFailover: Bool = true
+    /// Pop up a card, with which way to look, when an aircraft is about to pass close.
+    public var flybyCards: Bool = true
+    /// An aircraft whose closest pass is within this distance counts as a flyby.
+    public var flybyDistanceNM: Double = 2 / Geo.milesPerNM
+    /// Flybys above this altitude are ignored (they are specks). 0 means any altitude.
+    public var flybyMaxAltitudeFt: Int = 20_000
+    /// The compass direction you look when watching TV, from your seat toward the screen. Nil until set.
+    public var viewerHeadingDeg: Double?
+    public var directionNames = DirectionNames()
 
     public init() {}
 
     enum CodingKeys: String, CodingKey {
-        case home, homeName, mapRadiusNM, alertRadiusNM, units, feed, autoCycle, cycleSeconds, refreshSeconds, demoMode, showTrails, photoContact
+        case home, homeName, homeSource, mapRadiusNM, alertRadiusNM, units, feed, autoCycle, cycleSeconds, refreshSeconds, demoMode, showTrails, photoContact
         case idleHideSeconds, nightDimming, alertLevel, autoFailover
+        case flybyCards, flybyDistanceNM, flybyMaxAltitudeFt, viewerHeadingDeg, directionNames
     }
 
     // Tolerant decoding so adding a setting later never wipes a saved home location.
@@ -36,6 +54,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         let d = AppSettings()
         home = try c.decodeIfPresent(GeoPoint.self, forKey: .home)
         homeName = try c.decodeIfPresent(String.self, forKey: .homeName)
+        homeSource = try c.decodeIfPresent(HomeSource.self, forKey: .homeSource)
         mapRadiusNM = try c.decodeIfPresent(Double.self, forKey: .mapRadiusNM) ?? d.mapRadiusNM
         alertRadiusNM = try c.decodeIfPresent(Double.self, forKey: .alertRadiusNM) ?? d.alertRadiusNM
         units = try c.decodeIfPresent(UnitSystem.self, forKey: .units) ?? d.units
@@ -50,6 +69,11 @@ public struct AppSettings: Codable, Equatable, Sendable {
         nightDimming = try c.decodeIfPresent(Bool.self, forKey: .nightDimming) ?? d.nightDimming
         alertLevel = try c.decodeIfPresent(AlertLevel.self, forKey: .alertLevel) ?? d.alertLevel
         autoFailover = try c.decodeIfPresent(Bool.self, forKey: .autoFailover) ?? d.autoFailover
+        flybyCards = try c.decodeIfPresent(Bool.self, forKey: .flybyCards) ?? d.flybyCards
+        flybyDistanceNM = try c.decodeIfPresent(Double.self, forKey: .flybyDistanceNM) ?? d.flybyDistanceNM
+        flybyMaxAltitudeFt = try c.decodeIfPresent(Int.self, forKey: .flybyMaxAltitudeFt) ?? d.flybyMaxAltitudeFt
+        viewerHeadingDeg = try c.decodeIfPresent(Double.self, forKey: .viewerHeadingDeg)
+        directionNames = try c.decodeIfPresent(DirectionNames.self, forKey: .directionNames) ?? d.directionNames
     }
 }
 

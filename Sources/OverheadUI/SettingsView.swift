@@ -1,53 +1,16 @@
 import SwiftUI
-import CoreLocation
 import OverheadKit
-
-@MainActor
-final class LocationFinder: NSObject, ObservableObject, CLLocationManagerDelegate {
-    enum State: Equatable {
-        case idle, working, found(GeoPoint), failed(String)
-    }
-
-    @Published var state: State = .idle
-    private let manager = CLLocationManager()
-
-    func request() {
-        state = .working
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyKilometer
-        manager.requestWhenInUseAuthorization()
-        manager.requestLocation()
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let l = locations.last else { return }
-        let point = GeoPoint(latitude: l.coordinate.latitude, longitude: l.coordinate.longitude)
-        Task { @MainActor in self.state = .found(point) }
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        let message = (error as? CLError)?.code == .denied
-            ? "Location access is off for this app. Use search instead, or enable it in Settings."
-            : "Couldn't determine this device's location. Try searching for your city or ZIP code."
-        Task { @MainActor in self.state = .failed(message) }
-    }
-}
 
 struct SettingsView: View {
     @Bindable var engine: TrackingEngine
     @Environment(\.dismiss) private var dismiss
-
-    @StateObject private var finder = LocationFinder()
-    @State private var query = ""
-    @State private var results: [Place] = []
-    @State private var searchState: String?
-    @State private var searching = false
 
     var body: some View {
         NavigationStack {
             Form {
                 locationSection
                 displaySection
+                flybySection
                 dataSection
                 photosSection
                 diagnosticsSection
@@ -66,83 +29,108 @@ struct SettingsView: View {
         // Opaque: the cover otherwise lets the dashboard show through the form.
         .background(Theme.ink.ignoresSafeArea())
         .preferredColorScheme(.dark)
-        .onChange(of: finder.state) { _, state in
-            if case .found(let point) = state { setHome(point, name: "Apple TV location") }
-        }
     }
 
     // MARK: Sections
 
+    /// Unknown accuracy (a home saved by an older version) counts as approximate.
+    private var homeIsApproximate: Bool { engine.settings.home != nil && (engine.settings.homeSource?.isApproximate ?? true) }
+
     private var locationSection: some View {
         Section {
-            LabeledContent("Watching over", value: engine.settings.home == nil ? "Not set (demo traffic)" : engine.locationName)
-
-            Button {
-                finder.request()
+            NavigationLink {
+                HomeLocationView(engine: engine)
             } label: {
-                Label("Use this device's location", systemImage: "location.fill")
-            }
-            if case .working = finder.state { Text("Finding location…").foregroundStyle(.secondary) }
-            if case .failed(let message) = finder.state { Text(message).foregroundStyle(.orange) }
-
-            TextField("City, State or ZIP code", text: $query)
-                .onSubmit { Task { await search() } }
-            Button {
-                Task { await search() }
-            } label: {
-                Label(searching ? "Searching…" : "Search", systemImage: "magnifyingglass")
-            }
-            .disabled(query.trimmingCharacters(in: .whitespaces).count < 2 || searching)
-            if let searchState { Text(searchState).foregroundStyle(.secondary) }
-            ForEach(results) { place in
-                Button {
-                    setHome(place.location, name: place.fullName)
-                    results = []; query = ""; searchState = nil
-                } label: {
-                    VStack(alignment: .leading) {
-                        Text(place.name)
-                        if !place.subtitle.isEmpty { Text(place.subtitle).font(.footnote).foregroundStyle(.secondary) }
-                    }
-                }
+                LabeledContent("Home location", value: engine.settings.home == nil ? "Not set" : engine.locationName)
             }
         } header: {
             Text("Location")
         } footer: {
-            Text("Your location stays on this device. Data providers only ever see it rounded to roughly a mile.")
+            if engine.settings.home == nil {
+                Text("Not set, so demo traffic is showing. Open Home location to enter your street address.").foregroundStyle(.orange)
+            } else if homeIsApproximate {
+                Text("Only approximate: directions to a close flyby can be a mile or more off. Open Home location and enter your street address.").foregroundStyle(.orange)
+            } else {
+                Text("Exact. Open Home location to change it.")
+            }
         }
     }
+
 
     private var displaySection: some View {
         let unit = engine.settings.units.distance(nm: 1).unit
         return Section("Display") {
-            Picker("Map radius", selection: presetBinding(\.mapRadiusNM, presets: mapPresets)) {
-                ForEach(mapPresets, id: \.self) { Text("\(Int($0)) \(unit)").tag($0) }
-            }
-            Picker("Overhead zone", selection: presetBinding(\.alertRadiusNM, presets: alertPresets)) {
-                ForEach(alertPresets, id: \.self) { Text("\(Int($0)) \(unit)").tag($0) }
-            }
-            Picker("Units", selection: $engine.settings.units) {
-                ForEach(UnitSystem.allCases) { Text($0.title).tag($0) }
-            }
-            Picker("Hide controls when idle", selection: $engine.settings.idleHideSeconds) {
-                Text("Never").tag(0.0)
-                ForEach([10.0, 15, 30, 60], id: \.self) { Text("After \(Int($0)) seconds").tag($0) }
-            }
+            ChoiceRow(title: "Map radius", selection: presetBinding(\.mapRadiusNM, presets: mapPresets),
+                      choices: mapPresets.map { ("\(Int($0)) \(unit)", $0) })
+            ChoiceRow(title: "Overhead zone", selection: presetBinding(\.alertRadiusNM, presets: alertPresets),
+                      choices: alertPresets.map { ("\(Int($0)) \(unit)", $0) })
+            ChoiceRow(title: "Units", selection: $engine.settings.units, choices: UnitSystem.allCases.map { ($0.title, $0) })
+            ChoiceRow(title: "Hide controls when idle", selection: $engine.settings.idleHideSeconds,
+                      choices: [("Never", 0.0)] + [10.0, 15, 30, 60].map { ("After \(Int($0)) seconds", $0) })
             Toggle("Dim at night (10 PM to 6 AM)", isOn: $engine.settings.nightDimming)
             Toggle("Flight trails", isOn: $engine.settings.showTrails)
             Toggle("Rotate through aircraft overhead", isOn: $engine.settings.autoCycle)
         }
     }
 
+    private var flybySection: some View {
+        let units = engine.settings.units
+        let unit = units.distance(nm: 1).unit
+        return Section {
+            if homeIsApproximate {
+                NavigationLink {
+                    HomeLocationView(engine: engine)
+                } label: {
+                    Label("Directions need your exact location. Set it here.", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+            }
+            Toggle("Card for close flybys", isOn: $engine.settings.flybyCards)
+            if engine.settings.flybyCards {
+                ChoiceRow(title: "Counts as close", selection: presetBinding(\.flybyDistanceNM, presets: flybyPresets),
+                          choices: flybyPresets.map { ("Within \(Int($0)) \(unit)", $0) })
+                ChoiceRow(title: "Ignore aircraft above", selection: $engine.settings.flybyMaxAltitudeFt,
+                          choices: [("Nothing (any altitude)", 0)] + [5_000, 10_000, 20_000, 30_000].map { (units.altitude(ft: Double($0)).text, $0) })
+            }
+            ChoiceRow(title: "When watching TV, I face", selection: $engine.settings.viewerHeadingDeg, choices: headingChoices)
+            NavigationLink {
+                DirectionNamesView(engine: engine)
+            } label: {
+                LabeledContent("Names for each side", value: DirectionNamesView.summary(engine.settings.directionNames))
+            }
+            Button {
+                engine.showSampleFlyby()
+                dismiss()
+            } label: {
+                Label("Show a sample card", systemImage: "airplane")
+            }
+        } header: {
+            Text("Close flybys")
+        } footer: {
+            Text("A card says when an aircraft will pass close and which way to look.\n1. Enter your street address under Location above.\n2. Choose which way you face when you watch TV, from your seat toward the screen, so \"ahead\" is past the TV.\n3. Optionally name each side after a door or window.\nThen show the sample card: it shows a plane due north, so check it against a compass app.")
+        }
+    }
+
+    private var headingChoices: [(title: String, value: Double?)] {
+        [("Not set (use compass points)", nil)] + (0..<16).map { i in
+            let degrees = Double(i) * 22.5
+            return ("\(Geo.compassName(degrees).capitalized) (\(Geo.compass(degrees)))", degrees)
+        }
+    }
+
+    private var flybyPresets: [Double] {
+        switch engine.settings.units {
+        case .imperial: [1, 2, 3, 5]
+        case .metric: [2, 3, 5, 8]
+        case .aviation: [1, 2, 3, 4]
+        }
+    }
+
     private var dataSection: some View {
         Section {
-            Picker("Aircraft data", selection: $engine.settings.feed) {
-                ForEach(FeedProvider.allCases) { Text($0.title).tag($0) }
-            }
+            ChoiceRow(title: "Aircraft data", selection: $engine.settings.feed, choices: FeedProvider.allCases.map { ($0.title, $0) })
             Toggle("Use the other provider if this one fails", isOn: $engine.settings.autoFailover)
-            Picker("Alerts", selection: $engine.settings.alertLevel) {
-                ForEach(AlertLevel.allCases) { Text($0.title).tag($0) }
-            }
+            ChoiceRow(title: "Alerts", selection: $engine.settings.alertLevel, choices: AlertLevel.allCases.map { ($0.title, $0) })
             Toggle("Demo mode (fictional traffic)", isOn: $engine.settings.demoMode)
         } header: {
             Text("Data")
@@ -223,23 +211,4 @@ struct SettingsView: View {
             set: { engine.settings[keyPath: keyPath] = $0 / perNM })
     }
 
-    // MARK: Actions
-
-    private func setHome(_ point: GeoPoint, name: String) {
-        engine.settings.demoMode = false
-        engine.settings.homeName = name
-        engine.settings.home = point
-        dismiss()
-    }
-
-    private func search() async {
-        searching = true; searchState = nil
-        defer { searching = false }
-        do {
-            results = try await PlaceSearch.search(query)
-            if results.isEmpty { searchState = "No matches. Try a nearby city, or a ZIP code." }
-        } catch {
-            searchState = "Search failed. Check the network connection."
-        }
-    }
 }

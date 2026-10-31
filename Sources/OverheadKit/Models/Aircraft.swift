@@ -92,6 +92,10 @@ public struct Aircraft: Identifiable, Hashable, Sendable {
     public var windSpeedKt: Double?
     public var outsideAirTempC: Double?
     public var sourceType: String?
+    /// The pressure setting (QNH, hPa) selected in the cockpit, when the aircraft broadcasts it.
+    public var altimeterSettingHPa: Double?
+    /// Added to the barometric (pressure) altitude to get altitude above sea level; set from the area's pressure setting.
+    public var qnhCorrectionFt = 0
 
     public init(
         hex: String, callsign: String? = nil, registration: String? = nil, typeCode: String? = nil,
@@ -103,7 +107,8 @@ public struct Aircraft: Identifiable, Hashable, Sendable {
         indicatedAirspeedKt: Double? = nil, trueAirspeedKt: Double? = nil, trueHeadingDeg: Double? = nil,
         magneticHeadingDeg: Double? = nil, rollDeg: Double? = nil, selectedAltitudeFt: Int? = nil,
         selectedHeadingDeg: Double? = nil, autopilotModes: [String] = [], windDirectionDeg: Double? = nil,
-        windSpeedKt: Double? = nil, outsideAirTempC: Double? = nil, sourceType: String? = nil
+        windSpeedKt: Double? = nil, outsideAirTempC: Double? = nil, sourceType: String? = nil,
+        altimeterSettingHPa: Double? = nil
     ) {
         self.hex = hex; self.callsign = callsign; self.registration = registration; self.typeCode = typeCode
         self.typeDescription = typeDescription; self.operatorName = operatorName; self.yearBuilt = yearBuilt
@@ -116,9 +121,16 @@ public struct Aircraft: Identifiable, Hashable, Sendable {
         self.selectedAltitudeFt = selectedAltitudeFt; self.selectedHeadingDeg = selectedHeadingDeg
         self.autopilotModes = autopilotModes; self.windDirectionDeg = windDirectionDeg
         self.windSpeedKt = windSpeedKt; self.outsideAirTempC = outsideAirTempC; self.sourceType = sourceType
+        self.altimeterSettingHPa = altimeterSettingHPa
     }
 
-    public var altitudeFt: Int? { onGround ? 0 : (barometricAltitudeFt ?? geometricAltitudeFt) }
+    /// Altitude above sea level, never negative. Barometric altitude is pressure altitude, so it is corrected for the local
+    /// pressure first (`Altimetry`); whatever still reads below zero is shown as zero.
+    public var altitudeFt: Int? {
+        if onGround { return 0 }
+        guard let baro = barometricAltitudeFt else { return geometricAltitudeFt.map { max(0, $0) } }
+        return max(0, baro + qnhCorrectionFt)
+    }
     public var isMoving: Bool { (groundSpeedKt ?? 0) > 5 }
 
     /// Dead-reckoned position, so markers glide between 5-second feed updates.

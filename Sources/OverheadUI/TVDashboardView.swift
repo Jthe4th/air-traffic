@@ -105,7 +105,14 @@ public struct TVDashboardView: View {
                 .offset(x: 1750, y: 410)
 
             TimelineView(.periodic(from: .now, by: 1)) { timeline in
-                AlertBanner(alerts: engine.alerts(at: fixedNow ?? timeline.date), units: engine.settings.units)
+                let now = fixedNow ?? timeline.date
+                let alerts = engine.alerts(at: now)
+                VStack(spacing: 14) {
+                    if !alerts.isEmpty { AlertBanner(alerts: alerts, units: engine.settings.units) }
+                    if let flyby = engine.flybyCards(at: now).first {
+                        FlybyBanner(card: flyby, units: engine.settings.units).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
             }
             .frame(width: 1000)
             .offset(x: 840, y: 206)
