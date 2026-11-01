@@ -21,13 +21,13 @@ struct StationBanner: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(card.headline).labelStyle(Theme.station)
-                Text(SpaceStation.shortName).font(Theme.serif(54, weight: .semibold)).foregroundStyle(Theme.text)
+                Text(card.object.shortName).font(Theme.serif(54, weight: .semibold)).foregroundStyle(Theme.text)
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(card.moments, id: \.label) { moment in
                         HStack(alignment: .firstTextBaseline, spacing: 14) {
                             Text(moment.label).labelStyle(Theme.secondary).frame(width: 118, alignment: .leading)
                             Text(moment.time).font(Theme.number(26, weight: .bold)).foregroundStyle(Theme.text)
-                            Text(moment.place).font(Theme.body(25)).foregroundStyle(Theme.text.opacity(0.92)).lineLimit(1).minimumScaleFactor(0.6)
+                            Text(moment.place).font(Theme.body(25)).foregroundStyle(Theme.text.opacity(0.92)).lineLimit(2).minimumScaleFactor(0.8)
                         }
                     }
                 }
@@ -42,10 +42,10 @@ struct StationBanner: View {
 
     private var compactBody: some View {
         HStack(spacing: 20) {
-            AirlineBadge(size: 64, spacecraft: true)
+            AirlineBadge(size: 64, spacecraft: card.object.silhouette)
             VStack(alignment: .leading, spacing: 2) {
                 Text(card.headline).labelStyle(Theme.station)
-                Text("\(SpaceStation.shortName) at \(card.moments.first?.time ?? "")")
+                Text("\(card.object.shortName) at \(card.moments.first?.time ?? "")")
                     .font(Theme.body(32, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
                 Text("\(card.route) · \(card.brightnessText) · reaches \(card.peakDegrees)° up")
                     .font(Theme.body(24)).foregroundStyle(Theme.secondary).lineLimit(1).minimumScaleFactor(0.7)
@@ -110,7 +110,7 @@ private struct PassDial: View {
                 ctx.stroke(flown, with: .color(Theme.station), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
                 ctx.drawLayer { layer in
                     layer.addFilter(.shadow(color: Theme.station.opacity(0.8), radius: 9))
-                    layer.fill(Silhouettes.path(.station, center: p, size: 36, headingDeg: heading.isFinite ? heading : 0), with: .color(Theme.station))
+                    layer.fill(Silhouettes.path(card.object.silhouette, center: p, size: 36, headingDeg: heading.isFinite ? heading : 0), with: .color(Theme.station))
                 }
             }
         }

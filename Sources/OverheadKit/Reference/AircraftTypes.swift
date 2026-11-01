@@ -10,13 +10,15 @@ public enum AircraftKind: String, Sendable {
     case helicopter = "Helicopter"
     case military = "Military"
     case spacecraft = "Space station"
+    case tiangong = "Chinese space station"
     case other = "Aircraft"
 
-    public enum Silhouette: Sendable { case jet, prop, helicopter, station }
+    public enum Silhouette: Sendable { case jet, prop, helicopter, station, tiangong }
 
     public var silhouette: Silhouette {
         switch self {
         case .spacecraft: .station
+        case .tiangong: .tiangong
         case .helicopter: .helicopter
         case .turboprop, .lightPiston: .prop
         default: .jet
@@ -58,12 +60,13 @@ public enum AircraftTypes {
 
     private static let kinds: [String: AircraftKind] = [
         "nb": .narrowBody, "wb": .wideBody, "rj": .regionalJet, "tp": .turboprop,
-        "bj": .businessJet, "lp": .lightPiston, "he": .helicopter, "mil": .military, "sc": .spacecraft,
+        "bj": .businessJet, "lp": .lightPiston, "he": .helicopter, "mil": .military, "sc": .spacecraft, "tg": .tiangong,
     ]
 
     // code|name|kind
     private static let source = """
     ISS|International Space Station|sc
+    CSS|Tiangong Space Station|tg
     A318|Airbus A318|nb
     A319|Airbus A319|nb
     A320|Airbus A320|nb

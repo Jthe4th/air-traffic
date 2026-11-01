@@ -577,7 +577,7 @@ private func at(_ unix: Double) -> Date { Date(timeIntervalSince1970: unix) }
 
     @Test func theCardLingersBrieflyThenGoes() throws {
         let (e, start) = engineForPasses(secondsBefore: 600)
-        let end = try #require(e.nextStationPass(after: start)).end.date
+        let end = try #require(e.nextStationPass(after: start)).pass.end.date
         #expect(e.stationCards(at: end.addingTimeInterval(10)).count == 1)
         #expect(e.stationCards(at: end.addingTimeInterval(30)).isEmpty)
     }
@@ -586,9 +586,10 @@ private func at(_ unix: Double) -> Date { Date(timeIntervalSince1970: unix) }
         let (e, start) = engineForPasses(secondsBefore: 600)
         let orbit = try #require(SatelliteOrbit(issElements))
         let direct = PassFinder.visiblePasses(of: orbit, from: appleParkLike, between: start.addingTimeInterval(-1200), and: start.addingTimeInterval(10 * 86_400))
-        #expect(e.stationPasses == direct && !direct.isEmpty)
-        #expect(e.nextStationPass(after: start)?.id == direct.first?.id)
-        #expect(e.nextStationPass(after: start.addingTimeInterval(86_400))?.id == direct.first { $0.end.date > start.addingTimeInterval(86_400) }?.id)
+        let issPasses = e.stationPasses.filter { $0.object == .iss }.map(\.pass)
+        #expect(issPasses == direct && !direct.isEmpty)
+        #expect(e.nextStationPass(after: start)?.pass.id == direct.first?.id)
+        #expect(e.nextStationPass(after: start.addingTimeInterval(86_400))?.pass.id == direct.first { $0.end.date > start.addingTimeInterval(86_400) }?.id)
     }
 
     @Test func nothingShowsWhenTheFeatureIsOffOrInDemoMode() {
@@ -610,7 +611,7 @@ private func at(_ unix: Double) -> Date { Date(timeIntervalSince1970: unix) }
 
     @Test func oldElementsAreNotTrusted() {
         let (e, start) = engineForPasses(secondsBefore: 600)
-        let stale = issElements.epoch.addingTimeInterval(SpaceStation.maximumElementAge + 3600)
+        let stale = issElements.epoch.addingTimeInterval(SpaceObject.maximumElementAge + 3600)
         if case .outdated = e.stationStatus(at: stale) {} else { Issue.record("expected outdated at \(stale)") }
         #expect(e.stationCards(at: stale).isEmpty && e.nextStationPass(after: stale) == nil)
         if case .ready = e.stationStatus(at: start) {} else { Issue.record("expected ready at \(start)") }
@@ -660,7 +661,11 @@ private func at(_ unix: Double) -> Date { Date(timeIntervalSince1970: unix) }
 
     private struct Provider: OrbitalElementsProviding {
         var result: Result<OrbitalElements, Error>
-        func stationElements() async throws -> OrbitalElements { try result.get() }
+        func elements(for object: SpaceObject) async throws -> OrbitalElements {
+            // Only the Space Station has data here; the other station is reported as unavailable.
+            if object == .iss { return try result.get() }
+            throw FeedError.http(404)
+        }
     }
 
     private func settled(_ e: TrackingEngine, until done: () -> Bool) async {
@@ -671,9 +676,9 @@ private func at(_ unix: Double) -> Date { Date(timeIntervalSince1970: unix) }
         var s = AppSettings(); s.demoMode = false; s.home = appleParkLike
         let e = TrackingEngine(settings: s, persists: false, orbits: Provider(result: .success(issElements)))
         e.startStationLoop()
-        await settled(e) { e.stationElements != nil }
+        await settled(e) { e.stationElementSets[.iss] != nil }
         defer { e.stop() }
-        #expect(e.stationElements == issElements)
+        #expect(e.stationElementSets[.iss] == issElements)
         if case .ready(let epoch) = e.stationStatus(at: issElements.epoch.addingTimeInterval(3600)) { #expect(epoch == issElements.epoch) } else { Issue.record("not ready") }
     }
 
@@ -681,10 +686,10 @@ private func at(_ unix: Double) -> Date { Date(timeIntervalSince1970: unix) }
         var s = AppSettings(); s.demoMode = false; s.home = appleParkLike
         let e = TrackingEngine(settings: s, persists: false, orbits: Provider(result: .failure(FeedError.http(503))))
         e.startStationLoop()
-        await settled(e) { e.stationFetchError != nil }
+        await settled(e) { e.stationFetchErrors[.iss] != nil }
         defer { e.stop() }
-        #expect(e.stationFetchError == "Data provider returned HTTP 503")
-        #expect(e.stationStatus(at: Date()) == .failed("Data provider returned HTTP 503"))
+        #expect(e.stationFetchErrors[.iss] == "Data provider returned HTTP 503")
+        #expect(e.stationStatus(for: .iss, at: Date()) == .failed("Data provider returned HTTP 503"))
     }
 
     @Test func noNetworkIsTouchedWithoutASourceInTestsOrPreviews() {
@@ -695,14 +700,15 @@ private func at(_ unix: Double) -> Date { Date(timeIntervalSince1970: unix) }
     }
 
     @Test func theDownloadAddressCarriesNoLocation() {
-        let url = CelesTrakProvider.url.absoluteString
-        #expect(url == "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE")
-        #expect(!url.contains("lat") && !url.contains("lon"))
+        let iss = CelesTrakProvider.url(for: .iss).absoluteString, tiangong = CelesTrakProvider.url(for: .tiangong).absoluteString
+        #expect(iss == "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE")
+        #expect(tiangong == "https://celestrak.org/NORAD/elements/gp.php?CATNR=48274&FORMAT=TLE")
+        #expect(!iss.contains("lat") && !iss.contains("lon") && !tiangong.contains("lat") && !tiangong.contains("lon"))
     }
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["LIVE_TESTS"] != nil))
     func liveElementsPutTheStationWhereAPublicTrackerSaysItIs() async throws {
-        let elements = try await CelesTrakProvider().stationElements()
+        let elements = try await CelesTrakProvider().elements(for: .iss)
         #expect(elements.catalogNumber == 25544 && abs(elements.age(at: Date())) < 5 * 86_400)
         let now = Date()
         let mine = try #require(SatelliteOrbit(elements)?.sample(at: now))
@@ -716,4 +722,251 @@ private func at(_ unix: Double) -> Date { Date(timeIntervalSince1970: unix) }
 
 private extension Aircraft {
     func withTime(_ date: Date) -> Aircraft { var a = self; a.positionTime = date; a.position = Geo.destination(from: position, bearing: trackDeg ?? 0, distanceNM: (groundSpeedKt ?? 0) * date.timeIntervalSince(positionTime) / 3600); return a }
+}
+
+/// The Tiangong (Tianhe core module) element set published by CelesTrak on 2026-11-01.
+let tiangongElements = OrbitalElements(
+    name: "CSS (TIANHE)",
+    line1: "1 48274U 21035A   26305.38936679  .00008747  00000+0  10390-3 0  9994",
+    line2: "2 48274  41.4675 208.4160 0004086 243.9286 116.1132 15.61278896314597")!
+
+@Suite struct TiangongOrbitTests {
+    // Reference values: python-sgp4 for positions; Skyfield with DE421 for passes and sky angles, observer at 37.3349, -122.0090.
+    @Test func theCatalogueKnowsBothStations() {
+        #expect(SpaceObject.allCases == [.iss, .tiangong])
+        #expect(SpaceObject(catalogNumber: 25544) == .iss && SpaceObject(catalogNumber: 48274) == .tiangong && SpaceObject(catalogNumber: 1) == nil)
+        #expect(tiangongElements.catalogNumber == SpaceObject.tiangong.catalogNumber)
+        #expect(abs(tiangongElements.periodMinutes - 92.2) < 0.1)
+    }
+
+    @Test func positionsMatchTheReference() throws {
+        let sgp4 = try #require(SGP4(tiangongElements))
+        let cases: [(Double, Vec3, Vec3)] = [
+            (0, Vec3(x: -5948.09241773, y: -3218.26281153, z: -0.00443701), Vec3(x: 2.74030745, y: -5.05883820, z: 5.08799710)),
+            (45, Vec3(x: 6110.68269969, y: 2874.33515671, z: 315.66536094), Vec3(x: -2.23508180, y: 5.31611288, z: -5.07711786)),
+            (600, Vec3(x: 5863.76160412, y: 3341.93795780, z: -395.27264705), Vec3(x: -3.11033141, y: 4.86289591, z: -5.06980739)),
+            (2880, Vec3(x: 2092.61447054, y: -4637.14256454, z: 4448.25703629), Vec3(x: 7.16422338, y: 2.71795620, z: -0.53693750)),
+            (10080, Vec3(x: 5565.68126027, y: -3428.86066675, z: 1726.44374279), Vec3(x: 4.18105173, y: 4.41494211, z: -4.69368289)),
+        ]
+        for (minutes, r, v) in cases {
+            let s = try #require(sgp4.propagate(minutesSinceEpoch: minutes))
+            #expect(abs(s.position.x - r.x) < 1e-4 && abs(s.position.y - r.y) < 1e-4 && abs(s.position.z - r.z) < 1e-4, "position at \(minutes) min")
+            #expect(abs(s.velocity.x - v.x) < 1e-6 && abs(s.velocity.y - v.y) < 1e-6 && abs(s.velocity.z - v.z) < 1e-6, "velocity at \(minutes) min")
+        }
+    }
+
+    @Test func skyAnglesAndGroundPointMatchTheReferenceAtAHighPass() throws {
+        let orbit = try #require(SatelliteOrbit(tiangongElements, standardMagnitude: SpaceObject.tiangong.standardMagnitude))
+        let date = at(1_793_587_329)
+        let v = try #require(orbit.view(from: Sky.Observer(appleParkLike), at: date))
+        #expect(abs(v.azimuthDeg - 17.2099) < 0.05 && abs(v.elevationDeg - 69.2060) < 0.02 && abs(v.rangeKm - 413.293) < 0.2)
+        let s = try #require(orbit.sample(at: date))
+        #expect(abs(s.subpoint.latitude - 38.5242) < 0.001 && abs(s.subpoint.longitude + 121.5397) < 0.001 && abs(s.altitudeKm - 387.967) < 0.01)
+    }
+
+    private struct Ref { let start: Double, peak: Double, end: Double, peakEl: Double
+        init(_ s: Double, _ p: Double, _ e: Double, _ h: Double) { start = s; peak = p; end = e; peakEl = h } }
+    private static let reference: [Ref] = [
+        Ref(1_793_587_139.0, 1_793_587_329.0, 1_793_587_329.0, 69.2),
+        Ref(1_793_669_946.0, 1_793_670_131.0, 1_793_670_316.0, 48.5),
+        Ref(1_793_675_759.0, 1_793_675_849.0, 1_793_675_849.0, 23.3),
+        Ref(1_793_758_559.0, 1_793_758_749.0, 1_793_758_841.0, 73.9),
+        Ref(1_793_847_194.0, 1_793_847_350.0, 1_793_847_376.0, 23.0),
+        Ref(1_793_929_979.0, 1_793_930_160.0, 1_793_930_340.0, 41.0),
+        Ref(1_794_101_476.0, 1_794_101_563.0, 1_794_101_717.0, 22.9),
+    ]
+
+    private func twelveDays() throws -> [SatellitePass] {
+        let orbit = try #require(SatelliteOrbit(tiangongElements, standardMagnitude: SpaceObject.tiangong.standardMagnitude))
+        let start = at(1_793_534_400)
+        return PassFinder.visiblePasses(of: orbit, from: appleParkLike, between: start, and: start.addingTimeInterval(12 * 86_400))
+    }
+
+    @Test func findsTheSamePassesAsTheReference() throws {
+        let passes = try twelveDays()
+        #expect(passes.count == Self.reference.count)
+        for (pass, expected) in zip(passes, Self.reference) {
+            #expect(abs(pass.start.date.timeIntervalSince1970 - expected.start) < 2.5, "start of \(expected.start)")
+            #expect(abs(pass.peak.date.timeIntervalSince1970 - expected.peak) < 2.5, "peak of \(expected.start)")
+            #expect(abs(pass.end.date.timeIntervalSince1970 - expected.end) < 2.5, "end of \(expected.start)")
+            #expect(abs(pass.peak.elevationDeg - expected.peakEl) < 0.3, "peak height of \(expected.start)")
+        }
+    }
+
+    @Test func itsPassesAreFaintButStillBrightWhenHighUp() throws {
+        let passes = try twelveDays()
+        for pass in passes { #expect((-3.6 ... 1.5).contains(pass.brightestMagnitude), "magnitude \(pass.brightestMagnitude)") }
+        #expect(passes.contains { $0.brightestMagnitude > 0 })       // some low passes are faint: that is what the floor is for
+        let high = try #require(passes.max { $0.peak.elevationDeg < $1.peak.elevationDeg })
+        #expect(high.brightestMagnitude < -2 && high.brightestMagnitude > -3.6)     // about -2.6 for a good pass, as published
+    }
+
+    @Test func aFainterStandardMagnitudeShiftsBrightnessByExactlyThatMuch() {
+        let sat = Vec3(x: 6_790, y: 0, z: 0), observer = Vec3(x: 6_378, y: 0, z: 0), sun = Vec3(x: 0.2, y: 0.9, z: 0.4).unit
+        let iss = SatelliteOrbit.magnitude(satellite: sat, observer: observer, sun: sun, rangeKm: 412, standard: SpaceObject.iss.standardMagnitude)
+        let tiangong = SatelliteOrbit.magnitude(satellite: sat, observer: observer, sun: sun, rangeKm: 412, standard: SpaceObject.tiangong.standardMagnitude)
+        #expect(abs((tiangong - iss) - 1.3) < 1e-9)
+    }
+}
+
+@MainActor
+@Suite struct TwoStationEngineTests {
+    private func engine(change: (inout AppSettings) -> Void = { _ in }) -> TrackingEngine {
+        var s = AppSettings(); s.demoMode = false; s.home = appleParkLike
+        change(&s)
+        return TrackingEngine(settings: s, persists: false)
+    }
+
+    /// Home 5 NM from the point under Tiangong at the high pass at 1793587329.
+    private func engineUnderTiangong(change: (inout AppSettings) -> Void = { _ in }) throws -> (TrackingEngine, Date) {
+        let t0 = at(1_793_587_329)
+        let under = try #require(SatelliteOrbit(tiangongElements)).sample(at: t0)!
+        var s = AppSettings(); s.demoMode = false
+        s.home = Geo.destination(from: under.subpoint, bearing: 250, distanceNM: 5)
+        change(&s)
+        return (TrackingEngine(settings: s, persists: false), t0)
+    }
+
+    @Test func tiangongIsTrackedLikeAnAircraftWithItsOwnIdentity() throws {
+        let (e, t0) = try engineUnderTiangong()
+        e.useStationElements(tiangongElements, at: t0)
+        e.ingest([], at: t0)
+        let station = try #require(e.aircraft.first)
+        #expect(station.id == "CSS" && station.aircraft.title == "Tiangong" && station.aircraft.isSpacecraft)
+        #expect(station.typeName == "Tiangong Space Station")
+        #expect(AircraftTypes.silhouette(for: station.aircraft) == .tiangong)
+        #expect(abs((station.aircraft.spacecraft?.altitudeKm ?? 0) - 388) < 3 && station.aircraft.spacecraft?.name == "Tiangong Space Station")
+        #expect(e.featuredID == "CSS")
+        #expect(SpaceObject.iss.silhouette == .station && SpaceObject.tiangong.silhouette == .tiangong)
+    }
+
+    @Test func tiangongKeepsItsTrailWhileTheOtherStationIsBeingUpdatedToo() throws {
+        let (e, t0) = try engineUnderTiangong()
+        e.useStationElements(issElements, at: t0)
+        e.useStationElements(tiangongElements, at: t0)
+        e.updateStation(now: t0.addingTimeInterval(2))
+        e.updateStation(now: t0.addingTimeInterval(4))
+        let station = try #require(e.aircraft.first { $0.id == "CSS" })
+        #expect(station.firstSeen == t0 && station.trail.count >= 3)
+    }
+
+    @Test func theSpaceStationDoesNotAppearJustBecauseTiangongIsOverhead() throws {
+        let (e, t0) = try engineUnderTiangong()
+        e.useStationElements(issElements, at: t0)
+        e.useStationElements(tiangongElements, at: t0)
+        #expect(e.aircraft.map(\.id) == ["CSS"])           // the ISS is on the other side of the world
+    }
+
+    @Test func passesFromBothStationsAreListedSoonestFirstEachWithItsOwnName() throws {
+        let e = engine()
+        let start = at(1_793_538_937)
+        e.useStationElements(issElements, at: start.addingTimeInterval(-600))
+        e.useStationElements(tiangongElements, at: start.addingTimeInterval(-600))
+        let objects = Set(e.stationPasses.map(\.object))
+        #expect(objects == [.iss, .tiangong])
+        #expect(zip(e.stationPasses, e.stationPasses.dropFirst()).allSatisfy { $0.pass.start.date <= $1.pass.start.date })
+        #expect(Set(e.stationPasses.map(\.id)).count == e.stationPasses.count)
+        // The ISS pass at 1793538937 comes first; once it is over, Tiangong's at 1793587139 is next, then the ISS's at 1793622622.
+        #expect(e.nextStationPass(after: start)?.object == .iss)
+        #expect(e.nextStationPass(after: at(1_793_540_000))?.object == .tiangong)
+        #expect(e.nextStationPass(after: at(1_793_588_000))?.object == .iss)            // the ISS's second comes before Tiangong's
+        #expect(e.nextStationPass(after: at(1_793_629_000))?.object == .tiangong)       // then Tiangong's second, before the ISS's fourth
+        let cards = e.stationCards(at: at(1_793_587_139 - 600))
+        #expect(cards.map(\.object) == [.tiangong] && cards.first?.name == "Tiangong Space Station")
+    }
+
+    @Test func tiangongsFaintPassesAreNotAnnouncedButTheSpaceStationsAre() {
+        let e = engine()
+        e.useStationElements(tiangongElements, at: at(1_793_534_400))
+        let tiangong = e.stationPasses.filter { $0.object == .tiangong }
+        #expect(!tiangong.isEmpty && tiangong.allSatisfy { $0.pass.brightestMagnitude <= -1.0 })
+        // The reference list has Tiangong passes of magnitude +0.9, -0.4 and -0.1 (starting 1793675759, 1793847194 and 1794101476): none is announced.
+        let starts = Set(tiangong.map { Int($0.pass.start.date.timeIntervalSince1970) })
+        #expect(starts.isDisjoint(with: [1_793_675_759, 1_793_847_194, 1_794_101_476].flatMap { [$0 - 2, $0 - 1, $0, $0 + 1, $0 + 2] }))
+        #expect(starts.count == 4)
+        // The Space Station has no floor: every pass the finder finds in the same ten-day window is listed, even its faintest (-1.1).
+        let now = at(1_793_534_400)
+        e.useStationElements(issElements, at: now)
+        let direct = PassFinder.visiblePasses(of: SatelliteOrbit(issElements)!, from: appleParkLike, between: now.addingTimeInterval(-600), and: now.addingTimeInterval(10 * 86_400))
+        #expect(e.stationPasses.filter { $0.object == .iss }.map(\.pass) == direct && direct.count >= 6)
+    }
+
+    @Test func eachStationHasItsOwnSwitch() throws {
+        let e = engine()
+        let start = at(1_793_538_937)
+        e.useStationElements(issElements, at: start.addingTimeInterval(-600))
+        e.useStationElements(tiangongElements, at: start.addingTimeInterval(-600))
+        e.settings.tiangongEnabled = false
+        #expect(!e.stationPasses.contains { $0.object == .tiangong } && e.stationPasses.contains { $0.object == .iss })
+        #expect(e.stationStatus(for: .tiangong) == .off)
+        if case .ready = e.stationStatus(for: .iss, at: start) {} else { Issue.record("the ISS should still be ready") }
+        e.settings.issEnabled = false
+        #expect(e.stationPasses.isEmpty && e.nextStationPass(after: start) == nil && !e.settings.watchesAnyStation)
+    }
+
+    @Test func switchingTiangongOffRemovesItFromTheMapButNotTheOtherStation() throws {
+        let (e, t0) = try engineUnderTiangong()
+        e.useStationElements(tiangongElements, at: t0)
+        #expect(e.aircraft.map(\.id) == ["CSS"])
+        e.settings.tiangongEnabled = false
+        #expect(e.aircraft.isEmpty)
+        e.ingest([], at: t0.addingTimeInterval(1))
+        #expect(e.aircraft.isEmpty)
+    }
+
+    @Test func eachStationsPassGetsItsOwnHeadsUpSound() throws {
+        let e = engine()
+        let issStart = at(1_793_538_937), tiangongStart = at(1_793_587_139)
+        e.useStationElements(issElements, at: issStart.addingTimeInterval(-20 * 60))
+        e.useStationElements(tiangongElements, at: issStart.addingTimeInterval(-20 * 60))
+        e.updateStation(now: issStart.addingTimeInterval(-14 * 60))
+        #expect(e.stationChime == StationChime(kind: .headsUp, serial: 1))
+        e.updateStation(now: tiangongStart.addingTimeInterval(-14 * 60))
+        #expect(e.stationChime == StationChime(kind: .headsUp, serial: 2))
+    }
+
+    @Test func theSampleCanBeEitherStation() {
+        let e = engine()
+        let t0 = at(1_800_000_000)
+        e.showSampleStationPass(for: .tiangong, at: t0)
+        let card = e.stationCards(at: t0.addingTimeInterval(1)).first
+        #expect(card?.object == .tiangong && card?.headline == "Sample · Tiangong pass" && card?.isSample == true)
+    }
+
+    @Test func cardIdsDifferBetweenStationsEvenForTheSameMoment() {
+        let pass = StationPassCardTestPass.make()
+        #expect(StationPassCard(pass: pass, asOf: pass.start.date, object: .iss).id != StationPassCard(pass: pass, asOf: pass.start.date, object: .tiangong).id)
+    }
+
+    @Test func settingsRememberBothSwitchesAndOlderFilesKeepTiangongOn() throws {
+        var s = AppSettings(); s.tiangongEnabled = false
+        #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(s)) == s)
+        let old = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"issEnabled":false,"issLeadMinutes":10}"#.utf8))
+        #expect(!old.issEnabled && old.tiangongEnabled && old.issLeadMinutes == 10 && old.watchesAnyStation)
+    }
+
+    private struct PerObjectProvider: OrbitalElementsProviding {
+        var results: [SpaceObject: Result<OrbitalElements, Error>]
+        func elements(for object: SpaceObject) async throws -> OrbitalElements { try (results[object] ?? .failure(FeedError.malformed)).get() }
+    }
+
+    @Test func eachStationsOrbitIsDownloadedIndependently() async {
+        var s = AppSettings(); s.demoMode = false; s.home = appleParkLike
+        let e = TrackingEngine(settings: s, persists: false,
+                               orbits: PerObjectProvider(results: [.iss: .success(issElements), .tiangong: .failure(FeedError.http(503))]))
+        e.startStationLoop()
+        for _ in 0..<100 where e.stationElementSets[.iss] == nil || e.stationFetchErrors[.tiangong] == nil { try? await Task.sleep(for: .milliseconds(20)) }
+        defer { e.stop() }
+        #expect(e.stationElementSets[.iss] == issElements && e.stationElementSets[.tiangong] == nil)
+        #expect(e.stationFetchErrors[.tiangong] == "Data provider returned HTTP 503" && e.stationFetchErrors[.iss] == nil)
+        #expect(e.stationStatus(for: .tiangong) == .failed("Data provider returned HTTP 503"))
+    }
+}
+
+private enum StationPassCardTestPass {
+    static func make() -> SatellitePass {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let p = SatellitePass.Point(date: start, azimuthDeg: 225, elevationDeg: 20)
+        return SatellitePass(start: p, peak: p, end: p, path: [p], brightestMagnitude: -2, startsOutOfShadow: false, endsInShadow: false)
+    }
 }

@@ -122,9 +122,13 @@ public struct TVDashboardView: View {
                     if let flyby {
                         FlybyBanner(card: flyby, units: engine.settings.units).frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    // A slim reminder while the pass is far off, or whenever something else is already asking for attention.
-                    if let station = engine.stationCards(at: now).first {
-                        StationBanner(card: station, compact: station.phase == .upcoming || !alerts.isEmpty || flyby != nil)
+                    // A slim reminder while the pass is far off, or whenever something else is already asking for attention. When two
+                    // stations are due together the sooner leads and the other waits below it as a slim card (or alone, if the
+                    // screen is already busy).
+                    let busy = !alerts.isEmpty || flyby != nil
+                    let stations = Array(engine.stationCards(at: now).prefix(busy ? 1 : 2))
+                    ForEach(Array(stations.enumerated()), id: \.element.id) { index, station in
+                        StationBanner(card: station, compact: index > 0 || station.phase == .upcoming || busy)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }

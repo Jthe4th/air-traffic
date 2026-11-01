@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Jthe4th/air-traffic/actions/workflows/ci.yml/badge.svg)](https://github.com/Jthe4th/air-traffic/actions/workflows/ci.yml)
 
-**Version 1.1.3-beta** · tvOS · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Notes for contributors and AI agents](AGENTS.md)
+**Version 1.1.4-beta** · tvOS · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Notes for contributors and AI agents](AGENTS.md)
 
 A living-room display for Apple TV that shows the aircraft flying near your home: a dark live map, the plane
 that's closest or overhead featured in detail (photo, airline, route, progress, altitude, speed, vertical rate,
@@ -50,10 +50,11 @@ Apple Maps, and only the point and your town are kept): a ZIP or city search lan
 can be pasted instead. **Show a sample card** puts a plane due north on screen so you can check the
 settings against a compass app.
 
-**Space Station.** A card appears 15 minutes (5, 10 or 30 if you prefer, in Settings ▸ Space Station) before the
-International Space Station will be visible from your home, saying when it appears, which way to look, how high it gets and
+**Space stations.** A card appears 15 minutes (5, 10 or 30 if you prefer, in Settings ▸ Space stations) before the
+International Space Station, or China's Tiangong, will be visible from your home, saying when it appears, which way to look, how high it gets and
 how bright it will be, with a sky chart and a gentle chime as it begins (silent while the screen is dimmed at night). Whenever it flies over your home, day or night,
-it also shows on the map and in the strip like any aircraft, labelled ISS. Its orbit is computed on the Apple TV from
+it also shows on the map and in the strip like any aircraft, labelled ISS or Tiangong. Tiangong is fainter, so only its
+brighter passes (magnitude -1 or better) are announced. Its orbit is computed on the Apple TV from
 elements downloaded from CelesTrak (nothing about your location is sent); passes are only announced when you could really
 see it: lit by the Sun, sky dark, at least 20° up.
 
@@ -93,7 +94,7 @@ Tests/OverheadKitTests  unit tests, including an anonymised adsb.fi capture
 - **Positions:** adsb.fi (or adsb.lol) every 5 s; planes glide between updates by dead reckoning. Altitudes are above
   sea level: the pressure altitude aircraft report is corrected with the pressure setting nearby aircraft broadcast.
   Providers only ever see your location rounded to ~0.7 mi.
-- **Space Station:** orbital elements from CelesTrak, propagated with SGP4 and checked against independent software.
+- **Space stations:** orbital elements from CelesTrak, propagated with SGP4 and checked against independent software.
   Only the station's catalogue number is requested, so your location is never sent for it. Passes are searched ten days
   ahead from your home; the Sun and Earth's shadow decide whether a pass is visible. See `Sources/OverheadKit/Space`.
 - **Routes:** ADSB.lol standing data per callsign, then adsbdb.com for callsigns the first doesn't know or lists for

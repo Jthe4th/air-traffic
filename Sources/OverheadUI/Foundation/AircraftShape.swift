@@ -15,6 +15,7 @@ enum Silhouettes {
         ])
         case .helicopter: helicopter()
         case .station: station()
+        case .tiangong: tiangong()
         }
     }
 
@@ -50,6 +51,19 @@ enum Silhouettes {
             p.addRect(CGRect(x: x - 0.10, y: -0.46, width: 0.20, height: 0.92))
         }
         p.addRect(CGRect(x: -0.22, y: 0.18, width: 0.44, height: 0.07))                     // radiator
+        return p
+    }
+
+    /// Tiangong from above, flying nose-up: a T, with the two laboratory modules across the top, big solar arrays at their ends,
+    /// the core module running back along the flight path, and a smaller pair of arrays on the core.
+    private static func tiangong() -> Path {
+        var p = Path()
+        p.addRect(CGRect(x: -0.07, y: -0.62, width: 0.14, height: 1.40))                    // core module
+        p.addRect(CGRect(x: -0.60, y: -0.62, width: 1.20, height: 0.14))                    // laboratory modules
+        p.addRect(CGRect(x: -0.97, y: -0.97, width: 0.32, height: 0.95))                    // arrays on the left laboratory
+        p.addRect(CGRect(x: 0.65, y: -0.97, width: 0.32, height: 0.95))                     // arrays on the right laboratory
+        p.addRect(CGRect(x: -0.44, y: 0.20, width: 0.30, height: 0.50))                     // core arrays
+        p.addRect(CGRect(x: 0.14, y: 0.20, width: 0.30, height: 0.50))
         return p
     }
 

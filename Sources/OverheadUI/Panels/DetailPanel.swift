@@ -50,7 +50,7 @@ private struct PhotoHeader: View {
         let tint = a.isSpacecraft ? Theme.station : Theme.altitudeColor(a.altitudeFt.map(Double.init), onGround: a.onGround)
         ZStack(alignment: .topLeading) {
             // The backdrop is always there, so the photo fades in over it instead of over an empty box.
-            if a.isSpacecraft { spaceBackdrop } else { backdrop(tint: tint) }
+            if a.isSpacecraft { spaceBackdrop(AircraftTypes.silhouette(for: a)) } else { backdrop(tint: tint) }
             if let photo = tracked.photo {
                 CachedImage(url: photo.imageURL)
                     .frame(width: DetailPanel.width - 56, height: 230)
@@ -99,7 +99,7 @@ private struct PhotoHeader: View {
     }
 
     /// Night sky with the Earth's limb glowing along the bottom, and the station itself.
-    private var spaceBackdrop: some View {
+    private func spaceBackdrop(_ shape: AircraftKind.Silhouette) -> some View {
         ZStack {
             LinearGradient(colors: [Color(red: 0.02, green: 0.04, blue: 0.12), Color(red: 0.05, green: 0.09, blue: 0.22)], startPoint: .top, endPoint: .bottom)
             Canvas { ctx, size in
@@ -116,8 +116,8 @@ private struct PhotoHeader: View {
                                      center: .center, startRadius: 40, endRadius: 330))
                 .frame(width: 900, height: 340)
                 .offset(y: 190)
-            SilhouetteView(kind: .station).fill(Theme.station.opacity(0.22)).frame(width: 250, height: 250).rotationEffect(.degrees(-24)).offset(x: 130, y: -6)
-            SilhouetteView(kind: .station).stroke(Theme.station.opacity(0.6), lineWidth: 2).frame(width: 250, height: 250).rotationEffect(.degrees(-24)).offset(x: 130, y: -6)
+            SilhouetteView(kind: shape).fill(Theme.station.opacity(0.22)).frame(width: 250, height: 250).rotationEffect(.degrees(-24)).offset(x: 130, y: -6)
+            SilhouetteView(kind: shape).stroke(Theme.station.opacity(0.6), lineWidth: 2).frame(width: 250, height: 250).rotationEffect(.degrees(-24)).offset(x: 130, y: -6)
         }
         .frame(width: DetailPanel.width - 56, height: 230)
     }
@@ -152,7 +152,7 @@ private struct IdentityBlock: View {
         if let craft = a.spacecraft {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 18) {
-                    AirlineBadge(size: 80, spacecraft: true)
+                    AirlineBadge(size: 80, spacecraft: AircraftTypes.silhouette(for: a))
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Crewed spacecraft").labelStyle(Theme.secondary).lineLimit(1)
                         Text(a.title).font(Theme.serif(68)).foregroundStyle(Theme.text)

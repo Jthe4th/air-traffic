@@ -113,23 +113,25 @@ struct SettingsView: View {
     }
 
     private var stationSection: some View {
-        let status = engine.stationStatus()
+        let issStatus = engine.stationStatus(for: .iss), tiangongStatus = engine.stationStatus(for: .tiangong)
+        let watching = engine.settings.watchesAnyStation
         return Section {
-            Toggle("Watch for the Space Station", isOn: $engine.settings.issEnabled)
-            if engine.settings.issEnabled {
+            Toggle("International Space Station", isOn: $engine.settings.issEnabled)
+            Toggle("Tiangong (China's space station)", isOn: $engine.settings.tiangongEnabled)
+            if watching {
                 ChoiceRow(title: "Warn me", selection: $engine.settings.issLeadMinutes,
                           choices: AppSettings.issLeadChoices.map { ("\($0) minutes before", $0) })
                 Toggle("Play a chime", isOn: $engine.settings.issChime)
-                if case .demo = status {
-                    Text("Set your location (above) to see when the Space Station passes over your home.").foregroundStyle(.orange)
+                if case .demo = (engine.settings.issEnabled ? issStatus : tiangongStatus) {
+                    Text("Set your location (above) to see when the stations pass over your home.").foregroundStyle(.orange)
                 } else {
-                    LabeledContent("Next visible pass", value: nextPassText(status))
-                    LabeledContent("Orbit data", value: orbitDataText(status))
+                    LabeledContent("Next visible pass", value: nextPassText)
+                    LabeledContent("Orbit data", value: orbitDataText)
                 }
                 // Without a home the welcome card is on screen and would sit on top of the sample.
                 if engine.settings.home != nil {
                     Button {
-                        engine.showSampleStationPass()
+                        engine.showSampleStationPass(for: engine.settings.issEnabled ? .iss : .tiangong)
                         dismiss()
                     } label: {
                         Label("Show a sample card", systemImage: "sparkles")
@@ -137,32 +139,38 @@ struct SettingsView: View {
                 }
             }
         } header: {
-            Text("Space Station")
+            Text("Space stations")
         } footer: {
-            Text("A card appears before the Space Station crosses your sky after dark, with where to look, and a chime as it begins (silent while the screen is dimmed at night). Whenever it flies over your home, in daylight too, it shows on the map like an aircraft. Its orbit is downloaded from CelesTrak, which is told nothing about where you are.")
+            Text("A card appears before a space station crosses your sky after dark, with where to look, and a chime as it begins (silent while the screen is dimmed at night). Whenever one flies over your home, in daylight too, it shows on the map like an aircraft. Orbits are downloaded from CelesTrak, which is told nothing about where you are. Tiangong is fainter than the Space Station.")
         }
     }
 
-    private func nextPassText(_ status: StationStatus) -> String {
-        switch status {
-        case .ready:
-            guard let pass = engine.nextStationPass() else { return "None in the next 10 days" }
-            return StationPassCard.whenText(for: pass, now: Date())
-        case .waiting: return "Waiting for orbit data"
-        case .outdated: return "Orbit data too old"
-        case .failed: return "Unavailable"
-        case .off, .demo: return "n/a"
+    private var nextPassText: String {
+        if let next = engine.nextStationPass() {
+            let when = StationPassCard.whenText(for: next.pass, now: Date())
+            return engine.settings.issEnabled && engine.settings.tiangongEnabled ? "\(next.object.shortName): \(when)" : when
         }
+        let statuses = SpaceObject.allCases.filter { engine.settings.watches($0) }.map { engine.stationStatus(for: $0) }
+        if statuses.contains(where: { if case .ready = $0 { return true } else { return false } }) { return "None in the next 10 days" }
+        if statuses.contains(where: { if case .waiting = $0 { return true } else { return false } }) { return "Waiting for orbit data" }
+        if statuses.contains(where: { if case .outdated = $0 { return true } else { return false } }) { return "Orbit data too old" }
+        return "Unavailable"
     }
 
-    private func orbitDataText(_ status: StationStatus) -> String {
-        switch status {
-        case .ready(let epoch): return "Current (from \(epoch.formatted(.dateTime.month(.abbreviated).day())))"
-        case .outdated(let epoch): return "From \(epoch.formatted(.dateTime.month(.abbreviated).day())); needs a connection"
-        case .waiting: return "Downloading…"
-        case .failed(let message): return message
-        case .off, .demo: return "n/a"
+    /// One line for every station being watched: current if all are, otherwise the first thing wrong.
+    private var orbitDataText: String {
+        let watched = SpaceObject.allCases.filter { engine.settings.watches($0) }
+        var oldest: Date?
+        for object in watched {
+            switch engine.stationStatus(for: object) {
+            case .ready(let epoch): oldest = min(oldest ?? epoch, epoch)
+            case .outdated(let epoch): return "\(object.shortName) from \(epoch.formatted(.dateTime.month(.abbreviated).day())); needs a connection"
+            case .waiting: return "Downloading…"
+            case .failed(let message): return message
+            case .off, .demo: continue
+            }
         }
+        return oldest.map { "Current (from \($0.formatted(.dateTime.month(.abbreviated).day())))" } ?? "n/a"
     }
 
     private var headingChoices: [(title: String, value: Double?)] {

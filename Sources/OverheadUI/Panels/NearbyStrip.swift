@@ -56,7 +56,7 @@ private struct Chip: View {
         let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
 
         HStack(spacing: 14) {
-            AirlineBadge(airline: tracked.airline, fallbackText: a.registration.map { String($0.prefix(2)) } ?? "", size: 58, spacecraft: a.isSpacecraft)
+            AirlineBadge(airline: tracked.airline, fallbackText: a.registration.map { String($0.prefix(2)) } ?? "", size: 58, spacecraft: a.isSpacecraft ? AircraftTypes.silhouette(for: a) : nil)
             VStack(alignment: .leading, spacing: 2) {
                 Text(tracked.flightNumber ?? a.title)
                     .font(Theme.number(28, weight: .bold)).foregroundStyle(Theme.text)

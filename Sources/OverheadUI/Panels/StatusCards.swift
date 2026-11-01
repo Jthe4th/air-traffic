@@ -19,14 +19,15 @@ struct QuietSkiesCard: View {
             // Re-read every minute, so "Tomorrow" becomes "Today" and a pass that has gone is replaced by the next.
             TimelineView(.periodic(from: .now, by: 60)) { timeline in
                 let now = fixedNow ?? timeline.date
-                if let pass = engine.nextStationPass(after: now) {
-                    let card = StationPassCard(pass: pass, asOf: now)
+                if let next = engine.nextStationPass(after: now) {
+                    let pass = next.pass
+                    let card = StationPassCard(next, asOf: now)
                     VStack(alignment: .leading, spacing: 0) {
                         Rectangle().fill(Theme.hairline).frame(height: 1.5).padding(.vertical, 6)
                         HStack(spacing: 18) {
-                            AirlineBadge(size: 58, spacecraft: true)
+                            AirlineBadge(size: 58, spacecraft: next.object.silhouette)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Next Space Station pass").labelStyle()
+                                Text("Next \(next.object.shortName) pass").labelStyle()
                                 Text(StationPassCard.whenText(for: pass, now: now)).font(Theme.body(30, weight: .bold)).foregroundStyle(Theme.text)
                                 Text("\(card.route) · \(card.brightnessText) · reaches \(card.peakDegrees)° up")
                                     .font(Theme.body(22)).foregroundStyle(Theme.secondary).lineLimit(1)

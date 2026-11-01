@@ -11,6 +11,7 @@ import OverheadUI
 //   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading, alert, flyby, ambient (append 2 or 3 for later telemetry pages),
 //                                                 issupcoming, issimminent, issnow, issover, issquiet (the Space Station, from its real orbit)
 //                                                 routechecking, routeunconfirmed, routenone (the route line when there is no route)
+//                                                 tiangongnow, tiangongover (Tiangong, from its real orbit)
 // Needs network access for map tiles on first run (cached afterwards by URLCache).
 
 @MainActor
@@ -37,15 +38,25 @@ let previewStation = OrbitalElements(
     line1: "1 25544U 98067A   26305.40213002  .00006924  00000+0  13304-3 0  9992",
     line2: "2 25544  51.6333 341.0833 0007085 335.3698  24.6951 15.49140766593021")!
 
+/// Tiangong's orbit as published by CelesTrak on 2026-11-01.
+let previewTiangong = OrbitalElements(
+    name: "CSS (TIANHE)",
+    line1: "1 48274U 21035A   26305.38936679  .00008747  00000+0  10390-3 0  9994",
+    line2: "2 48274  41.4675 208.4160 0004086 243.9286 116.1132 15.61278896314597")!
+
+/// The station a scene is about, and its orbit.
+func stationOrbitElements(_ scene: String) -> OrbitalElements { scene.hasPrefix("tiangong") ? previewTiangong : previewStation }
+
 /// Where the station is a quarter of an hour after its orbit was measured, so "overhead" scenes have it near the preview home.
-func stationOverheadDate() -> Date { previewStation.epoch.addingTimeInterval(3600) }
+func stationOverheadDate(_ elements: OrbitalElements) -> Date { elements.epoch.addingTimeInterval(3600) }
 
 /// The moment a Space Station scene is drawn at: relative to a real visible pass over the preview home.
 func stationSceneDate(_ scene: String) -> Date {
-    guard let orbit = SatelliteOrbit(previewStation) else { return previewStation.epoch }
-    if scene == "issover" { return stationOverheadDate() }
-    let from = previewStation.epoch
-    guard let pass = PassFinder.visiblePasses(of: orbit, from: DemoFeed.defaultHome, between: from, and: from.addingTimeInterval(10 * 86_400)).first else { return from }
+    let elements = stationOrbitElements(scene)
+    guard let orbit = SatelliteOrbit(elements) else { return elements.epoch }
+    if scene == "issover" || scene == "tiangongover" { return stationOverheadDate(elements) }
+    let from = elements.epoch
+    guard let pass = PassFinder.visiblePasses(of: orbit, from: DemoFeed.defaultHome, between: from, and: from.addingTimeInterval(10 * 86_400)).first(where: { $0.brightestMagnitude <= -1 }) else { return from }
     switch scene {
     case "issupcoming": return pass.start.date.addingTimeInterval(-14 * 60)
     case "issimminent": return pass.start.date.addingTimeInterval(-70)
@@ -61,11 +72,11 @@ func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEn
     if scene == "welcome" { settings.home = nil }
     if scene == "zoomin" { settings.mapRadiusNM = 5 / Geo.milesPerNM }
     if scene == "zoomout" || scene == "crowded" { settings.mapRadiusNM = 60 / Geo.milesPerNM }
-    if scene.hasPrefix("iss") {
+    if scene.hasPrefix("iss") || scene.hasPrefix("tiangong") {
         // The station feature is off in demo mode, so these scenes use a real (but fixed) home.
         settings.demoMode = false
         settings.home = DemoFeed.defaultHome
-        if scene == "issover", let here = SatelliteOrbit(previewStation)?.sample(at: date) {
+        if scene == "issover" || scene == "tiangongover", let here = SatelliteOrbit(stationOrbitElements(scene))?.sample(at: date) {
             settings.home = Geo.destination(from: here.subpoint, bearing: 250, distanceNM: 6)
         }
     }
@@ -100,7 +111,7 @@ func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEn
     var flights = DemoFeed.snapshot(center: engine.home, radiusNM: DemoFeed.loopRadiusNM, at: date)
     if scene == "crowded" { flights += crowd(around: engine.home, count: 110, at: date) }
     if scene == "quiet" || scene == "issquiet" { flights = [] }
-    if scene.hasPrefix("iss") { engine.useStationElements(previewStation, at: date) }
+    if scene.hasPrefix("iss") || scene.hasPrefix("tiangong") { engine.useStationElements(stationOrbitElements(scene), at: date) }
     if scene == "ground" {
         flights = [Aircraft(hex: "g1", callsign: "UAL1348", registration: "N77295", typeCode: "B739", position: engine.home,
                             positionTime: date, onGround: true, groundSpeedKt: 12, trackDeg: 90, wakeClass: .large)]
@@ -219,7 +230,7 @@ func run() async {
     for scene in scenes {
         let name = scene.hasSuffix("2") || scene.hasSuffix("3") ? String(scene.dropLast()) : scene
         let pageOffset = scene.hasSuffix("2") ? 7.0 : scene.hasSuffix("3") ? 14.0 : 0.0
-        let date = name.hasPrefix("iss") ? stationSceneDate(name) : date
+        let date = name.hasPrefix("iss") || name.hasPrefix("tiangong") ? stationSceneDate(name) : date
         let engine = await makeEngine(scene: name, photoURL: photoURL, at: date)
         let camera = TVDashboardView.camera(for: engine)
         await ImageStore.shared.prefetch(camera.tiles.map { MapStyle.url(for: $0) })

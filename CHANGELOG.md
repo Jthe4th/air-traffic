@@ -4,10 +4,25 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 and versions follow [Semantic Versioning](https://semver.org/).
 
 Pre-release builds are labelled `-beta`. Apple's bundle version field allows only digits and dots, so the app's
-`CFBundleShortVersionString` holds the number (`1.1.3`) and the label lives in `AT_RELEASE_CHANNEL`
-([project.yml](project.yml)); the app, this file and the git tags show them together (`1.1.3-beta`).
+`CFBundleShortVersionString` holds the number (`1.1.4`) and the label lives in `AT_RELEASE_CHANNEL`
+([project.yml](project.yml)); the app, this file and the git tags show them together (`1.1.4-beta`).
 
 ## [Unreleased]
+
+## [1.1.4-beta] - 2026-11-01
+
+### Added
+- **Tiangong, China's space station.** It gets the same treatment as the International Space Station: a warning card before
+  each pass you can see, a chime as it begins, a place in Quiet skies' "next pass", and, whenever it flies over your home,
+  a spot on the map and in the strip with its own T-shaped silhouette, name and card. The warning time and chime settings
+  are shared. Tiangong is fainter than the Space Station (a good pass is about magnitude -2.6, against -3.8), so its low,
+  poorly lit passes, which can be as faint as a dim star, are not announced: only passes brighter than magnitude -1. Its
+  brightness is an estimate from published typical peaks, so check it against a pass-prediction site.
+- When two stations are due together the sooner shows first and the other waits below it as a slim card.
+
+### Changed
+- Settings ▸ Space Station is now **Space stations**, with a switch for each station.
+- 18 new tests (203 in all), including Tiangong's orbit and a 12-day list of passes checked against Skyfield and python-sgp4.
 
 ## [1.1.3-beta] - 2026-11-01
 
@@ -171,7 +186,8 @@ First beta. tvOS only, installed from Xcode with a free Apple ID.
 - Free-account builds expire after 7 days and must be reinstalled from Xcode.
 - Remote focus behaviour of the zoom buttons has not yet been confirmed on a real Apple TV.
 
-[Unreleased]: https://github.com/Jthe4th/air-traffic/compare/v1.1.3-beta...HEAD
+[Unreleased]: https://github.com/Jthe4th/air-traffic/compare/v1.1.4-beta...HEAD
+[1.1.4-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.1.3-beta...v1.1.4-beta
 [1.1.3-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.1.2-beta...v1.1.3-beta
 [1.1.2-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.1.1-beta...v1.1.2-beta
 [1.1.1-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.1.0-beta...v1.1.1-beta

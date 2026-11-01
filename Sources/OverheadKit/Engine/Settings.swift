@@ -41,11 +41,22 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var directionNames = DirectionNames()
     /// Watch for the International Space Station: show it when it flies over, and announce passes you can see.
     public var issEnabled: Bool = true
-    /// How long before a visible pass the card appears.
+    /// The same for China's Tiangong space station.
+    public var tiangongEnabled: Bool = true
+    /// How long before a visible pass the card appears (for either station).
     public var issLeadMinutes: Int = 15
     public var issChime: Bool = true
 
     public static let issLeadChoices = [5, 10, 15, 30]
+
+    public func watches(_ object: SpaceObject) -> Bool {
+        switch object {
+        case .iss: issEnabled
+        case .tiangong: tiangongEnabled
+        }
+    }
+
+    public var watchesAnyStation: Bool { SpaceObject.allCases.contains(where: watches) }
 
     public init() {}
 
@@ -53,7 +64,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case home, homeName, homeSource, mapRadiusNM, alertRadiusNM, units, feed, autoCycle, cycleSeconds, refreshSeconds, demoMode, showTrails, photoContact
         case idleHideSeconds, nightDimming, alertLevel, autoFailover
         case flybyCards, flybyDistanceNM, flybyMaxAltitudeFt, viewerHeadingDeg, directionNames
-        case issEnabled, issLeadMinutes, issChime
+        case issEnabled, tiangongEnabled, issLeadMinutes, issChime
     }
 
     // Tolerant decoding so adding a setting later never wipes a saved home location.
@@ -83,6 +94,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         viewerHeadingDeg = try c.decodeIfPresent(Double.self, forKey: .viewerHeadingDeg)
         directionNames = try c.decodeIfPresent(DirectionNames.self, forKey: .directionNames) ?? d.directionNames
         issEnabled = try c.decodeIfPresent(Bool.self, forKey: .issEnabled) ?? d.issEnabled
+        tiangongEnabled = try c.decodeIfPresent(Bool.self, forKey: .tiangongEnabled) ?? d.tiangongEnabled
         let lead = try c.decodeIfPresent(Int.self, forKey: .issLeadMinutes) ?? d.issLeadMinutes
         issLeadMinutes = Self.issLeadChoices.contains(lead) ? lead : d.issLeadMinutes
         issChime = try c.decodeIfPresent(Bool.self, forKey: .issChime) ?? d.issChime

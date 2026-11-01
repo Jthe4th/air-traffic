@@ -29,7 +29,7 @@ public final class TrackingEngine {
             if needsRestart { restart() }
             else if settings.mapRadiusNM != oldValue.mapRadiusNM { viewRadiusDidChange() }
             if settings.photoContact != oldValue.photoContact { scheduleContactUpdate() }
-            if settings.issEnabled != oldValue.issEnabled { stationEnabledDidChange() }
+            if settings.issEnabled != oldValue.issEnabled || settings.tiangongEnabled != oldValue.tiangongEnabled { stationEnabledDidChange() }
         }
     }
 
@@ -54,19 +54,19 @@ public final class TrackingEngine {
     @ObservationIgnored private var sampleFlyby: (card: FlybyCard, until: Date)?
     /// The area's pressure setting, kept for a while so a quiet moment doesn't bring the negative altitudes back.
     @ObservationIgnored private var altimeter: (hPa: Double, at: Date)?
-    /// The Space Station's orbit and the passes worked out from it for the viewer's home.
-    public private(set) var stationElements: OrbitalElements?
-    public private(set) var stationPasses: [SatellitePass] = []
-    public private(set) var stationFetchError: String?
+    /// Each station's orbit, and the passes worked out from them for the viewer's home (soonest first).
+    public private(set) var stationElementSets: [SpaceObject: OrbitalElements] = [:]
+    public private(set) var stationPasses: [StationPass] = []
+    public private(set) var stationFetchErrors: [SpaceObject: String] = [:]
     /// The latest sound to play; a new value (a higher serial) means play it again.
     public private(set) var stationChime: StationChime?
-    @ObservationIgnored private var stationOrbit: SatelliteOrbit?
-    @ObservationIgnored private var stationUpdatedAt: Date?
-    @ObservationIgnored private var stationPassesComputedAt: Date?
+    @ObservationIgnored private var stationOrbits: [SpaceObject: SatelliteOrbit] = [:]
+    @ObservationIgnored private var stationUpdatedAt: [SpaceObject: Date] = [:]
+    @ObservationIgnored private var stationPassesComputedAt: [SpaceObject: Date] = [:]
     @ObservationIgnored var stationTask: Task<Void, Never>?
-    @ObservationIgnored private var stationAnnounced: [Int: StationPassCard.Phase] = [:]
+    @ObservationIgnored private var stationAnnounced: [String: StationPassCard.Phase] = [:]
     @ObservationIgnored private var stationChimeSerial = 0
-    @ObservationIgnored private var sampleStation: (pass: SatellitePass, until: Date)?
+    @ObservationIgnored private var sampleStation: (object: SpaceObject, pass: SatellitePass, until: Date)?
     @ObservationIgnored private let injectedOrbits: (any OrbitalElementsProviding)?
     /// A card stays this long after its pass ends, and elements are downloaded again after this long.
     @ObservationIgnored let stationLinger: TimeInterval = 20
@@ -196,7 +196,7 @@ public final class TrackingEngine {
         flybyActive = [:]
         flybyDone = [:]
         altimeter = nil
-        stationPasses = []; stationPassesComputedAt = nil; stationAnnounced = [:]; sampleStation = nil
+        stationPasses = []; stationPassesComputedAt = [:]; stationAnnounced = [:]; sampleStation = nil
         status = .starting
         start()
     }
@@ -307,8 +307,7 @@ public final class TrackingEngine {
         aircraft = merged
         // The station is never left to coast (it moves 4 NM a second): its orbit says where it is, or that it is gone. The kept
         // entry is only so its trail and first-seen time survive the feed report.
-        if let orbit = usableStationOrbit(at: now) { updateStationAircraft(orbit, now: now) }
-        else if aircraft.contains(where: { $0.aircraft.isSpacecraft }) { aircraft.removeAll { $0.aircraft.isSpacecraft } }
+        refreshStationAircraft(now: now)
         recordSightings(now: now)
         updateFeatured(now: now)
         updateFlybys(now: now)
@@ -351,7 +350,7 @@ public final class TrackingEngine {
             if featuredID != urgent.id { featuredID = urgent.id }
             return
         }
-        // The Space Station crosses the whole map in seconds and is not something to miss: it takes the card while it is in view.
+        // A station crosses the whole map in seconds and is not something to miss: it takes the card while it is in view.
         if let station = airborne.first(where: { $0.aircraft.isSpacecraft }) {
             if featuredID != station.id { featuredID = station.id }
             return
@@ -480,44 +479,44 @@ public final class TrackingEngine {
     }
 }
 
-// MARK: - Space Station
+// MARK: - Space stations
 
 extension TrackingEngine {
-    private var stationWanted: Bool { settings.issEnabled && !isDemo }
+    private func wanted(_ object: SpaceObject) -> Bool { settings.watches(object) && !isDemo }
 
-    private func usableStationOrbit(at now: Date) -> SatelliteOrbit? {
-        guard stationWanted, let orbit = stationOrbit, orbit.elements.age(at: now) <= SpaceStation.maximumElementAge else { return nil }
+    private func usableOrbit(_ object: SpaceObject, at now: Date) -> SatelliteOrbit? {
+        guard wanted(object), let orbit = stationOrbits[object], orbit.elements.age(at: now) <= SpaceObject.maximumElementAge else { return nil }
         return orbit
     }
 
-    public func stationStatus(at now: Date = Date()) -> StationStatus {
-        if !settings.issEnabled { return .off }
+    public func stationStatus(for object: SpaceObject = .iss, at now: Date = Date()) -> StationStatus {
+        if !settings.watches(object) { return .off }
         if isDemo { return .demo }
-        if let e = stationElements { return e.age(at: now) > SpaceStation.maximumElementAge ? .outdated(epoch: e.epoch) : .ready(epoch: e.epoch) }
-        if let error = stationFetchError { return .failed(error) }
+        if let e = stationElementSets[object] { return e.age(at: now) > SpaceObject.maximumElementAge ? .outdated(epoch: e.epoch) : .ready(epoch: e.epoch) }
+        if let error = stationFetchErrors[object] { return .failed(error) }
         return .waiting
     }
 
-    /// The next pass worth going outside for, if one is coming in the next ten days.
-    public func nextStationPass(after now: Date = Date()) -> SatellitePass? {
-        usableStationOrbit(at: now) == nil ? nil : stationPasses.first { $0.end.date > now }
+    /// The next pass worth going outside for, from any station being watched, if one is coming in the next ten days.
+    public func nextStationPass(after now: Date = Date()) -> StationPass? {
+        stationPasses.first { $0.pass.end.date > now && usableOrbit($0.object, at: now) != nil }
     }
 
     /// Cards for passes inside the warning time, or under way: soonest first. Also the viewer's sample card, while it lasts.
     public func stationCards(at now: Date = Date()) -> [StationPassCard] {
         if let sample = sampleStation {
-            if now < sample.until { return [StationPassCard(pass: sample.pass, asOf: now, isSample: true)] }
+            if now < sample.until { return [StationPassCard(pass: sample.pass, asOf: now, object: sample.object, isSample: true)] }
             sampleStation = nil
         }
-        guard usableStationOrbit(at: now) != nil else { return [] }
         let lead = Double(settings.issLeadMinutes) * 60
         return stationPasses
-            .filter { $0.start.date.timeIntervalSince(now) <= lead && now <= $0.end.date.addingTimeInterval(stationLinger) }
-            .map { StationPassCard(pass: $0, asOf: now) }
+            .filter { usableOrbit($0.object, at: now) != nil && $0.pass.start.date.timeIntervalSince(now) <= lead
+                && now <= $0.pass.end.date.addingTimeInterval(stationLinger) }
+            .map { StationPassCard($0, asOf: now) }
     }
 
     /// Shows a made-up pass starting in forty seconds, with its sounds, so the viewer can see and hear what a warning is like.
-    public func showSampleStationPass(at now: Date = Date()) {
+    public func showSampleStationPass(for object: SpaceObject = .iss, at now: Date = Date()) {
         let start = now.addingTimeInterval(40)
         let path: [SatellitePass.Point] = (0...12).map { i in
             let f = Double(i) / 12
@@ -525,48 +524,65 @@ extension TrackingEngine {
         }
         let pass = SatellitePass(start: path[0], peak: path[6], end: path[12], path: path, brightestMagnitude: -3.4,
                                  startsOutOfShadow: false, endsInShadow: false)
-        sampleStation = (pass, start.addingTimeInterval(20))
+        sampleStation = (object, pass, start.addingTimeInterval(20))
         announceStation(now: now)
     }
 
     /// Makes the engine use this orbit, as if it had just been downloaded. How tests and the design preview supply one without the network.
     public func useStationElements(_ elements: OrbitalElements, at now: Date = Date()) {
-        stationElements = elements
-        stationOrbit = SatelliteOrbit(elements)
-        stationUpdatedAt = now
-        stationFetchError = nil
-        stationPassesComputedAt = nil
+        guard let object = SpaceObject(catalogNumber: elements.catalogNumber) else { return }
+        stationElementSets[object] = elements
+        stationOrbits[object] = SatelliteOrbit(elements, standardMagnitude: object.standardMagnitude)
+        stationUpdatedAt[object] = now
+        stationFetchErrors[object] = nil
+        stationPassesComputedAt[object] = nil
         updateStation(now: now)
     }
 
-    /// Once a second: keeps the station's place in the aircraft list, the list of passes, and the sounds up to date.
+    /// Once a second: keeps each station's place in the aircraft list, the list of passes, and the sounds up to date.
     func updateStation(now: Date) {
-        if let orbit = usableStationOrbit(at: now) {
-            if stationPassesComputedAt.map({ now.timeIntervalSince($0) > 3600 }) ?? true { recomputeStationPasses(orbit, now: now) }
-            updateStationAircraft(orbit, now: now)
-        } else {
-            if aircraft.contains(where: { $0.aircraft.isSpacecraft }) { aircraft.removeAll { $0.aircraft.isSpacecraft } }
-            if !stationPasses.isEmpty { stationPasses = [] }
-            stationPassesComputedAt = nil
+        for object in SpaceObject.allCases {
+            if let orbit = usableOrbit(object, at: now) {
+                if stationPassesComputedAt[object].map({ now.timeIntervalSince($0) > 3600 }) ?? true { recomputeStationPasses(object, orbit, now: now) }
+                updateStationAircraft(object, orbit, now: now)
+            } else {
+                removeStationAircraft(object)
+                if stationPasses.contains(where: { $0.object == object }) { stationPasses.removeAll { $0.object == object } }
+                stationPassesComputedAt[object] = nil
+            }
         }
         announceStation(now: now)
     }
 
-    private func recomputeStationPasses(_ orbit: SatelliteOrbit, now: Date) {
-        stationPasses = PassFinder.visiblePasses(of: orbit, from: home, between: now.addingTimeInterval(-600), and: now.addingTimeInterval(10 * 86_400))
-        stationPassesComputedAt = now
+    /// Just the aircraft list, for a feed report: each station is placed from its orbit, or removed.
+    func refreshStationAircraft(now: Date) {
+        for object in SpaceObject.allCases {
+            if let orbit = usableOrbit(object, at: now) { updateStationAircraft(object, orbit, now: now) } else { removeStationAircraft(object) }
+        }
     }
 
-    /// The station is in the aircraft list only while it is within range of home, exactly as an aircraft would be.
-    private func updateStationAircraft(_ orbit: SatelliteOrbit, now: Date) {
+    private func recomputeStationPasses(_ object: SpaceObject, _ orbit: SatelliteOrbit, now: Date) {
+        let found = PassFinder.visiblePasses(of: orbit, from: home, between: now.addingTimeInterval(-600), and: now.addingTimeInterval(10 * 86_400))
+            .filter { $0.brightestMagnitude <= object.announceBrighterThan }
+            .map { StationPass(object: object, pass: $0) }
+        stationPasses = (stationPasses.filter { $0.object != object } + found).sorted { $0.pass.start.date < $1.pass.start.date }
+        stationPassesComputedAt[object] = now
+    }
+
+    private func removeStationAircraft(_ object: SpaceObject) {
+        if aircraft.contains(where: { $0.id == object.id }) { aircraft.removeAll { $0.id == object.id } }
+    }
+
+    /// A station is in the aircraft list only while it is within range of home, exactly as an aircraft would be.
+    private func updateStationAircraft(_ object: SpaceObject, _ orbit: SatelliteOrbit, now: Date) {
         let center = home
         guard let sample = orbit.sample(at: now), Geo.distanceNM(center, sample.subpoint) <= fetchRadiusNM * 1.1 else {
-            if aircraft.contains(where: { $0.aircraft.isSpacecraft }) { aircraft.removeAll { $0.aircraft.isSpacecraft } }
+            removeStationAircraft(object)
             return
         }
-        let station = SpaceStation.aircraft(from: sample, periodMinutes: orbit.elements.periodMinutes)
+        let station = object.aircraft(from: sample, periodMinutes: orbit.elements.periodMinutes)
         var tracked: TrackedAircraft
-        if let i = aircraft.firstIndex(where: { $0.aircraft.isSpacecraft }) {
+        if let i = aircraft.firstIndex(where: { $0.id == object.id }) {
             tracked = aircraft.remove(at: i)
         } else {
             tracked = TrackedAircraft(aircraft: station, firstSeen: now)
@@ -581,9 +597,9 @@ extension TrackingEngine {
 
     /// A heads-up sound when a card first appears, and another as the pass begins.
     private func announceStation(now: Date) {
-        var seen: Set<Int> = []
+        var seen: Set<String> = []
         for card in stationCards(at: now) {
-            let key = card.isSample ? -1 : card.id
+            let key = card.isSample ? "sample" : card.id
             seen.insert(key)
             let phase = card.phase, before = stationAnnounced[key]
             if before == nil, phase != .ended { sound(phase == .underway ? .rising : .headsUp) }
@@ -599,46 +615,52 @@ extension TrackingEngine {
     }
 
     private func stationEnabledDidChange() {
-        if settings.issEnabled {
-            if pollTask != nil { startStationLoop() }
-        } else {
-            stationTask?.cancel(); stationTask = nil
-        }
+        // Start again so a station switched on is fetched at once, and one switched off is left alone.
+        stationTask?.cancel(); stationTask = nil
+        if pollTask != nil { startStationLoop() }
         updateStation(now: Date())
     }
 
     func startStationLoop() {
         // Tests and previews stay off the network unless they bring their own source.
-        guard stationTask == nil, stationWanted, persists || injectedOrbits != nil else { return }
+        guard stationTask == nil, !isDemo, settings.watchesAnyStation, persists || injectedOrbits != nil else { return }
         stationTask = Task { [weak self] in await self?.stationLoop() }
     }
 
     private func stationLoop() async {
         let provider = injectedOrbits ?? CelesTrakProvider()
-        if persists, stationElements == nil, let cached = StationElementsCache.load() {
-            stationElements = cached.elements
-            stationOrbit = SatelliteOrbit(cached.elements)
-            stationUpdatedAt = cached.fetchedAt
+        if persists {
+            for object in SpaceObject.allCases where settings.watches(object) && stationElementSets[object] == nil {
+                guard let cached = StationElementsCache.load(object) else { continue }
+                stationElementSets[object] = cached.elements
+                stationOrbits[object] = SatelliteOrbit(cached.elements, standardMagnitude: object.standardMagnitude)
+                stationUpdatedAt[object] = cached.fetchedAt
+            }
             updateStation(now: Date())
         }
         var failures = 0
         while !Task.isCancelled {
-            if stationUpdatedAt.map({ Date().timeIntervalSince($0) > stationRefreshInterval }) ?? true {
+            var anyFailed = false
+            for object in SpaceObject.allCases where settings.watches(object) {
+                guard stationUpdatedAt[object].map({ Date().timeIntervalSince($0) > stationRefreshInterval }) ?? true else { continue }
                 do {
-                    let elements = try await provider.stationElements()
+                    let elements = try await provider.elements(for: object)
                     if Task.isCancelled { return }
+                    guard elements.catalogNumber == object.catalogNumber else { throw FeedError.malformed }
                     let fetched = Date()
                     useStationElements(elements, at: fetched)
-                    if persists { StationElementsCache.save(elements, fetchedAt: fetched) }
-                    failures = 0
+                    if persists { StationElementsCache.save(elements, fetchedAt: fetched, for: object) }
                 } catch is CancellationError {
                     return
                 } catch {
                     if Task.isCancelled { return }
-                    failures += 1
-                    stationFetchError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    anyFailed = true
+                    stationFetchErrors[object] = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 }
+                // The orbit host is a free service: leave a pause between one station's request and the next.
+                if injectedOrbits == nil { try? await Task.sleep(for: .seconds(1)) }
             }
+            failures = anyFailed ? failures + 1 : 0
             // Orbits change a few times a day, so there is no hurry; after a failure, try again sooner but not hammering.
             let wait = failures == 0 ? 15 * 60 : min(3600, 300 * pow(2, Double(min(failures, 4))))
             try? await Task.sleep(for: .seconds(wait))

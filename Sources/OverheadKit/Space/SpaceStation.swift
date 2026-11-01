@@ -1,57 +1,126 @@
 import Foundation
 
-/// Where the app gets the Space Station's orbit. Only the object's public catalogue number is sent, never a location.
-public protocol OrbitalElementsProviding: Sendable {
-    func stationElements() async throws -> OrbitalElements
-}
+/// The crewed stations the app watches for: each crosses the sky as a bright, steady, fast-moving star.
+public enum SpaceObject: String, CaseIterable, Sendable, Hashable {
+    case iss, tiangong
 
-public struct CelesTrakProvider: OrbitalElementsProviding {
-    public static let url = URL(string: "https://celestrak.org/NORAD/elements/gp.php?CATNR=\(SpaceStation.catalogNumber)&FORMAT=TLE")!
-
-    public init() {}
-
-    public func stationElements() async throws -> OrbitalElements {
-        var request = URLRequest(url: Self.url)
-        request.setValue(ClientIdentity.userAgent, forHTTPHeaderField: "User-Agent")
-        let (data, response) = try await HTTP.liveSession.data(for: request)
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { throw FeedError.http(http.statusCode) }
-        guard let text = String(data: data, encoding: .utf8), let elements = OrbitalElements.parse(text),
-              elements.catalogNumber == SpaceStation.catalogNumber else { throw FeedError.malformed }
-        return elements
-    }
-}
-
-/// The last orbit downloaded, kept so a restart or an outage does not lose the predictions.
-enum StationElementsCache {
-    private static let key = "station.elements.v1"
-    private struct Stored: Codable { var elements: OrbitalElements; var fetchedAt: Date }
-
-    static func load() -> (elements: OrbitalElements, fetchedAt: Date)? {
-        guard let data = UserDefaults.standard.data(forKey: key), let stored = try? JSONDecoder().decode(Stored.self, from: data) else { return nil }
-        return (stored.elements, stored.fetchedAt)
+    public var catalogNumber: Int {
+        switch self {
+        case .iss: 25544
+        case .tiangong: 48274         // the Tianhe core module; the other modules are docked to it on the same orbit
+        }
     }
 
-    static func save(_ elements: OrbitalElements, fetchedAt: Date) {
-        if let data = try? JSONEncoder().encode(Stored(elements: elements, fetchedAt: fetchedAt)) { UserDefaults.standard.set(data, forKey: key) }
+    public var name: String {
+        switch self {
+        case .iss: "International Space Station"
+        case .tiangong: "Tiangong Space Station"
+        }
     }
-}
 
-public enum SpaceStation {
-    public static let catalogNumber = 25544
-    public static let name = "International Space Station"
-    public static let shortName = "Space Station"
-    /// The station's identifier in the aircraft list.
-    public static let id = "ISS"
+    /// The name on cards and labels.
+    public var shortName: String {
+        switch self {
+        case .iss: "Space Station"
+        case .tiangong: "Tiangong"
+        }
+    }
+
+    /// The station's identifier in the aircraft list, and the type code it is looked up by.
+    public var id: String {
+        switch self {
+        case .iss: "ISS"
+        case .tiangong: "CSS"
+        }
+    }
+
+    /// What the map and strip call it.
+    public var callsign: String {
+        switch self {
+        case .iss: "ISS"
+        case .tiangong: "Tiangong"
+        }
+    }
+
+    /// Apparent magnitude at 1,000 km range and half lit; smaller is brighter. The ISS figure is the one pass-prediction sites use.
+    /// Tiangong's is an estimate, about 1.3 magnitudes fainter, from published typical peaks (about -2.6 against the ISS's -3.8).
+    public var standardMagnitude: Double {
+        switch self {
+        case .iss: -1.8
+        case .tiangong: -0.5
+        }
+    }
+
+    /// The outline drawn for it on the map, in the strip and on its card.
+    public var silhouette: AircraftKind.Silhouette { AircraftTypes.info(for: id)?.kind.silhouette ?? .station }
+
+    /// A visible pass is only announced if it is at least this bright (a smaller number is brighter), so a faint pass does not send
+    /// anyone outside for a dim star. The Space Station's passes are all bright enough to need no floor; Tiangong's low passes are not.
+    public var announceBrighterThan: Double {
+        switch self {
+        case .iss: .infinity
+        case .tiangong: -1.0
+        }
+    }
+
+    public init?(catalogNumber: Int) {
+        guard let match = Self.allCases.first(where: { $0.catalogNumber == catalogNumber }) else { return nil }
+        self = match
+    }
+
     /// Elements older than this are too far from their epoch to trust for a visual prediction.
     public static let maximumElementAge: TimeInterval = 14 * 86_400
 
     /// The station as a tracked object, so the map, nearby strip and detail card can show it like an aircraft.
-    static func aircraft(from sample: OrbitSample, periodMinutes: Double) -> Aircraft {
-        Aircraft(hex: id, callsign: "ISS", typeCode: "ISS", position: sample.subpoint, positionTime: sample.date,
+    func aircraft(from sample: OrbitSample, periodMinutes: Double) -> Aircraft {
+        Aircraft(hex: id, callsign: callsign, typeCode: id, position: sample.subpoint, positionTime: sample.date,
                  geometricAltitudeFt: Int((sample.altitudeKm * 3280.84).rounded()), groundSpeedKt: sample.groundSpeedKt,
                  trackDeg: sample.trackDeg, verticalRateFpm: 0, wakeClass: .spaceVehicle,
                  spacecraft: SpacecraftInfo(name: name, altitudeKm: sample.altitudeKm, orbitalSpeedKmS: sample.orbitalSpeedKmS,
                                             periodMinutes: periodMinutes, isSunlit: sample.isSunlit))
+    }
+}
+
+/// Where the app gets a station's orbit. Only the object's public catalogue number is sent, never a location.
+public protocol OrbitalElementsProviding: Sendable {
+    func elements(for object: SpaceObject) async throws -> OrbitalElements
+}
+
+public struct CelesTrakProvider: OrbitalElementsProviding {
+    public static func url(for object: SpaceObject) -> URL {
+        URL(string: "https://celestrak.org/NORAD/elements/gp.php?CATNR=\(object.catalogNumber)&FORMAT=TLE")!
+    }
+
+    public init() {}
+
+    public func elements(for object: SpaceObject) async throws -> OrbitalElements {
+        var request = URLRequest(url: Self.url(for: object))
+        request.setValue(ClientIdentity.userAgent, forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await HTTP.liveSession.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { throw FeedError.http(http.statusCode) }
+        guard let text = String(data: data, encoding: .utf8), let elements = OrbitalElements.parse(text),
+              elements.catalogNumber == object.catalogNumber else { throw FeedError.malformed }
+        return elements
+    }
+}
+
+/// The last orbit downloaded for each station, kept so a restart or an outage does not lose the predictions.
+enum StationElementsCache {
+    private struct Stored: Codable { var elements: OrbitalElements; var fetchedAt: Date }
+
+    /// The ISS keeps the key from before there was a second station, so an existing cache is still found.
+    private static func key(_ object: SpaceObject) -> String {
+        object == .iss ? "station.elements.v1" : "station.elements.v1.\(object.catalogNumber)"
+    }
+
+    static func load(_ object: SpaceObject) -> (elements: OrbitalElements, fetchedAt: Date)? {
+        guard let data = UserDefaults.standard.data(forKey: key(object)), let stored = try? JSONDecoder().decode(Stored.self, from: data),
+              stored.elements.catalogNumber == object.catalogNumber else { return nil }
+        return (stored.elements, stored.fetchedAt)
+    }
+
+    static func save(_ elements: OrbitalElements, fetchedAt: Date, for object: SpaceObject) {
+        if let data = try? JSONEncoder().encode(Stored(elements: elements, fetchedAt: fetchedAt)) { UserDefaults.standard.set(data, forKey: key(object)) }
     }
 }
 
@@ -77,18 +146,29 @@ public struct StationChime: Equatable, Sendable {
     public var serial: Int
 }
 
+/// A visible pass of one of the stations.
+public struct StationPass: Identifiable, Equatable, Sendable {
+    public var object: SpaceObject
+    public var pass: SatellitePass
+
+    public var id: String { "\(object.rawValue)-\(pass.id)" }
+}
+
 /// The card announcing a visible pass: when it starts, where to look, and how bright it will be.
 public struct StationPassCard: Identifiable, Equatable, Sendable {
+    public var object: SpaceObject
     public var pass: SatellitePass
     public var asOf: Date
     public var isSample = false
 
-    public init(pass: SatellitePass, asOf: Date, isSample: Bool = false) {
-        self.pass = pass; self.asOf = asOf; self.isSample = isSample
+    public init(pass: SatellitePass, asOf: Date, object: SpaceObject = .iss, isSample: Bool = false) {
+        self.object = object; self.pass = pass; self.asOf = asOf; self.isSample = isSample
     }
 
-    public var id: Int { pass.id }
-    public var name: String { SpaceStation.name }
+    public init(_ stationPass: StationPass, asOf: Date) { self.init(pass: stationPass.pass, asOf: asOf, object: stationPass.object) }
+
+    public var id: String { "\(object.rawValue)-\(pass.id)" }
+    public var name: String { object.name }
 
     public enum Phase: Sendable { case upcoming, imminent, underway, ended }
 
@@ -103,7 +183,7 @@ public struct StationPassCard: Identifiable, Equatable, Sendable {
     }
 
     public var headline: String {
-        if isSample && phase != .underway { return "Sample · Space Station pass" }
+        if isSample && phase != .underway { return "Sample · \(object.shortName) pass" }
         switch phase {
         case .upcoming: return "Visible in \(Self.minutes(secondsToStart))"
         case .imminent: return "Appears in \(Self.countdown(secondsToStart))"

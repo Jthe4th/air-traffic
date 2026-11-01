@@ -113,7 +113,10 @@ fail (write it, watch it fail, then fix).
 - **Altitude:** `barometricAltitudeFt` is *pressure* altitude (1013.25 hPa), which reads below zero near sea level on a
   high-pressure day. `Aircraft.altitudeFt` is the corrected, never-negative number; the engine sets `qnhCorrectionFt` at
   ingest from the median `nav_qnh` of low aircraft (`Altimetry`). Use `altitudeFt`, never the raw field, for display.
-- **Space Station:** the orbit is computed on the TV (`Sources/OverheadKit/Space`): `SGP4` (near-Earth only; deep-space
+- **Space stations:** `SpaceObject` is the catalogue (ISS, Tiangong): catalogue number, names, aircraft id, silhouette, standard
+  magnitude, and `announceBrighterThan` (a floor that drops Tiangong's faint low passes; the ISS has none). Everything is
+  per object: orbits, passes, aircraft entries (found by `object.id`, never "any spacecraft"), switches, card ids. Tiangong's
+  standard magnitude (-0.5) is an estimate; re-check it if its passes look wrong. The orbit is computed on the TV (`Sources/OverheadKit/Space`): `SGP4` (near-Earth only; deep-space
   orbits are refused) from CelesTrak elements, `Sky` for time, frames, Sun and shadow, `PassFinder` for visible passes
   (10° up, Sun below -6°, station sunlit, peak at least 20°). The engine adds the station to `aircraft` once a second while
   it is within range, flagged by `Aircraft.spacecraft`; everything that assumes an aircraft (routes, photos, flyby
