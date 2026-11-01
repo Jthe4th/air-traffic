@@ -231,7 +231,7 @@ struct SettingsView: View {
     private var aboutSection: some View {
         Section("About") {
             LabeledContent("Version", value: AppVersion.build.map { "\(AppVersion.display) (\($0))" } ?? AppVersion.display)
-            Text("Positions: adsb.fi and adsb.lol. Routes: ADSB.lol standing data. Photos: Planespotters.net (photographers credited on each photo). Maps: \(MapStyle.attribution).")
+            Text("Positions: adsb.fi and adsb.lol. Routes: ADSB.lol standing data and adsbdb.com. Photos: Planespotters.net (photographers credited on each photo). Maps: \(MapStyle.attribution).")
                 .font(.footnote).foregroundStyle(.secondary)
         }
     }

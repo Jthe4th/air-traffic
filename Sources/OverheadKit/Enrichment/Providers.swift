@@ -1,8 +1,19 @@
 import Foundation
 
+/// What a route provider found out about one aircraft.
+public enum RouteLookup: Equatable, Sendable {
+    case found(FlightRoute)
+    /// A database lists a route for this callsign, but the aircraft doesn't fit it: callsigns are reused for other trips.
+    case unconfirmed
+    /// No database has a route for this callsign.
+    case unavailable
+    /// Couldn't ask (offline, rate limited, or a busy lookup); worth trying again.
+    case failed
+}
+
 public protocol RouteProviding: Sendable {
-    /// A validated route for this aircraft, or nil when unknown or implausible.
-    func route(for aircraft: Aircraft) async -> FlightRoute?
+    /// A validated route for this aircraft, or the reason there isn't one.
+    func lookup(for aircraft: Aircraft) async -> RouteLookup
 }
 
 public protocol PhotoProviding: Sendable {
@@ -14,44 +25,85 @@ public struct NoPhotos: PhotoProviding {
     public func photo(for aircraft: Aircraft) async -> AircraftPhoto? { nil }
 }
 
-// MARK: - Routes (ADSB.lol / Virtual Radar Server "standing data")
+// MARK: - Routes
 
-public actor StandingDataRouteProvider: RouteProviding {
-    private struct Entry {
-        var airports: [Airport]?   // nil = confirmed unknown
-        var fetched: Date
+/// What one database said about a callsign.
+enum CallsignAnswer: Equatable, Sendable {
+    case airports([Airport])
+    case unknown
+    case failed
+}
+
+/// A database of routes keyed by callsign. Each holds a single static route per callsign, so what it says may be for another trip.
+protocol CallsignSource: Sendable {
+    func airports(forCallsign callsign: String) async -> CallsignAnswer
+}
+
+/// Asks each database in turn and keeps the first route the aircraft actually fits. Every answer goes through `RouteValidator`:
+/// a route is never shown just because a database lists it.
+public struct LiveRouteProvider: RouteProviding {
+    private let sources: [any CallsignSource]
+
+    public init() { sources = [StandingDataSource(), AdsbdbSource()] }
+    init(sources: [any CallsignSource]) { self.sources = sources }
+
+    public func lookup(for aircraft: Aircraft) async -> RouteLookup {
+        guard let callsign = aircraft.displayCallsign?.uppercased(), Airlines.split(callsign: callsign) != nil else { return .unavailable }
+        var listed = false, failed = false
+        for source in sources {
+            switch await source.airports(forCallsign: callsign) {
+            case .airports(let airports):
+                listed = true
+                guard let leg = RouteValidator.plausibleLeg(airports: airports, for: aircraft) else { continue }
+                let others = airports.filter { $0.icao != leg.origin.icao && $0.icao != leg.destination.icao }
+                return .found(FlightRoute(origin: leg.origin, destination: leg.destination, otherStops: others,
+                                          flightNumber: Airlines.flightNumber(forCallsign: callsign)))
+            case .unknown: break
+            case .failed: failed = true
+            }
+        }
+        if listed { return .unconfirmed }
+        return failed ? .failed : .unavailable
+    }
+}
+
+/// Caches answers (a long time for a route, an hour for "unknown"), asks one at a time with a pause between, and backs off when
+/// a free host says it is busy.
+private struct AnswerCache {
+    struct Entry { var airports: [Airport]?; var fetched: Date }
+    var entries: [String: Entry] = [:]
+    var inFlight: Set<String> = []
+    var nextRequest = Date.distantPast
+
+    func cached(_ callsign: String) -> CallsignAnswer? {
+        guard let entry = entries[callsign] else { return nil }
+        let ttl: TimeInterval = entry.airports == nil ? 3600 : 12 * 3600
+        guard Date().timeIntervalSince(entry.fetched) < ttl else { return nil }
+        return entry.airports.map { .airports($0) } ?? .unknown
     }
 
-    private var cache: [String: Entry] = [:]
-    private var inFlight: Set<String> = []
-    private var nextRequest = Date.distantPast
+    /// How long to wait before this request, reserving the next slot `spacing` seconds on.
+    mutating func reserveSlot(spacing: TimeInterval) -> TimeInterval {
+        let wait = max(nextRequest.timeIntervalSinceNow, 0)
+        nextRequest = Date().addingTimeInterval(wait + spacing)
+        return wait
+    }
+}
+
+// MARK: Routes (ADSB.lol / Virtual Radar Server "standing data")
+
+actor StandingDataSource: CallsignSource {
+    private var cache = AnswerCache()
     private let baseURL = URL(string: "https://vrs-standing-data.adsb.lol/routes")!
 
-    public init() {}
-
-    public func route(for aircraft: Aircraft) async -> FlightRoute? {
-        guard let callsign = aircraft.displayCallsign?.uppercased(), Airlines.split(callsign: callsign) != nil else { return nil }
-        let airports = await airports(forCallsign: callsign)
-        guard let airports,
-              let leg = RouteValidator.plausibleLeg(airports: airports, for: aircraft)
-        else { return nil }
-        let others = airports.filter { $0.icao != leg.origin.icao && $0.icao != leg.destination.icao }
-        return FlightRoute(origin: leg.origin, destination: leg.destination, otherStops: others,
-                           flightNumber: Airlines.flightNumber(forCallsign: callsign))
-    }
-
-    private func airports(forCallsign callsign: String) async -> [Airport]? {
-        if let entry = cache[callsign] {
-            let ttl: TimeInterval = entry.airports == nil ? 3600 : 12 * 3600
-            if Date().timeIntervalSince(entry.fetched) < ttl { return entry.airports }
-        }
-        guard !inFlight.contains(callsign) else { return nil }
-        inFlight.insert(callsign)
-        defer { inFlight.remove(callsign) }
+    func airports(forCallsign callsign: String) async -> CallsignAnswer {
+        if let answer = cache.cached(callsign) { return answer }
+        guard !cache.inFlight.contains(callsign) else { return .failed }
+        cache.inFlight.insert(callsign)
+        defer { cache.inFlight.remove(callsign) }
 
         // Be polite to a free static host: one request at a time, spaced out.
-        let wait = nextRequest.timeIntervalSinceNow
-        nextRequest = Date().addingTimeInterval(max(wait, 0) + 0.4)
+        let wait = cache.reserveSlot(spacing: 0.4)
         if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
 
         let url = baseURL.appending(path: String(callsign.prefix(2))).appending(path: "\(callsign).json")
@@ -60,13 +112,13 @@ public actor StandingDataRouteProvider: RouteProviding {
         do {
             let (data, response) = try await HTTP.session.data(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if status == 404 { cache[callsign] = Entry(airports: nil, fetched: Date()); return nil }
-            guard status == 200 else { return nil }
+            if status == 404 { cache.entries[callsign] = .init(airports: nil, fetched: Date()); return .unknown }
+            guard status == 200 else { return .failed }
             let parsed = Self.parse(data)
-            cache[callsign] = Entry(airports: parsed, fetched: Date())
-            return parsed
+            cache.entries[callsign] = .init(airports: parsed, fetched: Date())
+            return parsed.map { .airports($0) } ?? .unknown
         } catch {
-            return nil   // transient; try again on a later poll
+            return .failed   // transient; try again on a later poll
         }
     }
 
@@ -87,6 +139,66 @@ public actor StandingDataRouteProvider: RouteProviding {
                            elevationFt: a.alt_feet)
         }
         return airports.count >= 2 ? airports : nil
+    }
+}
+
+// MARK: Routes (adsbdb.com, a second database that often knows callsigns the first doesn't)
+
+actor AdsbdbSource: CallsignSource {
+    private var cache = AnswerCache()
+    private var coolOffUntil = Date.distantPast
+    private let baseURL = URL(string: "https://api.adsbdb.com/v0/callsign")!
+
+    func airports(forCallsign callsign: String) async -> CallsignAnswer {
+        if let answer = cache.cached(callsign) { return answer }
+        guard !cache.inFlight.contains(callsign), Date() >= coolOffUntil else { return .failed }
+        cache.inFlight.insert(callsign)
+        defer { cache.inFlight.remove(callsign) }
+
+        let wait = cache.reserveSlot(spacing: 0.5)
+        if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+
+        var request = URLRequest(url: baseURL.appending(path: callsign))
+        request.setValue(ClientIdentity.userAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        do {
+            let (data, response) = try await HTTP.session.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 429 { coolOffUntil = Date().addingTimeInterval(120); return .failed }
+            // An unknown callsign is a 404 with a plain-text body.
+            if status == 404 { cache.entries[callsign] = .init(airports: nil, fetched: Date()); return .unknown }
+            guard status == 200 else { return .failed }
+            let parsed = Self.parse(data)
+            cache.entries[callsign] = .init(airports: parsed, fetched: Date())
+            return parsed.map { .airports($0) } ?? .unknown
+        } catch {
+            return .failed
+        }
+    }
+
+    static func parse(_ data: Data) -> [Airport]? {
+        struct Payload: Decodable {
+            struct Response: Decodable {
+                struct Route: Decodable {
+                    struct A: Decodable {
+                        var icao_code: String?, iata_code: String?, name: String?, municipality: String?, country_iso_name: String?
+                        var latitude: Double?, longitude: Double?, elevation: Double?
+                    }
+                    var origin: A?, destination: A?
+                }
+                var flightroute: Route?
+            }
+            var response: Response?
+        }
+        guard let route = (try? JSONDecoder().decode(Payload.self, from: data))?.response?.flightroute else { return nil }
+        func airport(_ a: Payload.Response.Route.A?) -> Airport? {
+            guard let a, let icao = a.icao_code, let lat = a.latitude, let lon = a.longitude else { return nil }
+            let iata = (a.iata_code?.isEmpty ?? true) ? nil : a.iata_code
+            return Airport(icao: icao, iata: iata, name: a.name ?? icao, city: a.municipality ?? icao, countryCode: a.country_iso_name ?? "",
+                           location: GeoPoint(latitude: lat, longitude: lon), elevationFt: a.elevation)
+        }
+        guard let origin = airport(route.origin), let destination = airport(route.destination) else { return nil }
+        return [origin, destination]
     }
 }
 

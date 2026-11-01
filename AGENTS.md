@@ -70,6 +70,11 @@ fail (write it, watch it fail, then fix).
 - **Contact privacy:** `ClientIdentity.photoUserAgent` is the only place the contact may be sent, and only to
   Planespotters. Everything else uses `ClientIdentity.userAgent`. A test enforces this.
 - **Route data lies:** callsigns are reused. Always run routes through `RouteValidator`; never display an unvalidated one.
+  `LiveRouteProvider` asks ADSB.lol standing data, then adsbdb, and validates every listed route against the aircraft; it
+  reports `RouteLookup` (found, unconfirmed, unavailable, or couldn't ask) and the engine records it as `RouteStatus` so the
+  card can say "Checking route…" or "Route unconfirmed" instead of a blanket "Route not available". Both databases hold one
+  static route per callsign, so most "unconfirmed" flights are correct rejections, not bugs; measure before loosening the
+  corridor in `RouteValidator`.
 - **Maps:** CARTO's free dark tiles need an API key. The default is OpenStreetMap darkened with a colour filter
   in `TileLayer`; a custom tile URL is assumed to already be dark. airplanes.live also needs contact for access.
 - **Zoom:** the view radius (`settings.mapRadiusNM`) differs from the fetch radius (`fetchRadiusNM`, 1.9x). A test

@@ -20,7 +20,6 @@ Shipped work is in [CHANGELOG.md](CHANGELOG.md).
 - **Real airline logos,** replacing the brand-coloured letter badges, once licensing is checked.
 - **Broader reference data:** more airlines and aircraft types, and friendlier names for unusual aircraft.
 - **Quieter map near airports:** option to hide ground traffic labels.
-- **A second route source** for airliners the first has no route for.
 - **Today at a glance:** planes seen, highest, fastest and busiest hour, from the sightings history.
 - **Accessibility and localisation:** VoiceOver labels, larger-text support, translations.
 
@@ -28,8 +27,9 @@ Shipped work is in [CHANGELOG.md](CHANGELOG.md).
 
 - **Replace the personal photo contact** in the built-in default with a project support address or website.
 - **Review each free service's terms for an app with many users.** OpenStreetMap's tile servers discourage heavy
-  use from distributed apps, so a tile provider with its own plan is likely needed. Check adsb.fi, adsb.lol and
-  Planespotters too, including how photographers must be credited.
+  use from distributed apps, so a tile provider with its own plan is likely needed. Check adsb.fi, adsb.lol,
+  adsbdb and Planespotters too, including how photographers must be credited. adsbdb's route data is credited to David
+  Taylor and Jim Mason, who ask that it not be copied into other databases; the app only looks routes up.
 - **Join the paid Apple Developer Program** to distribute through TestFlight or the App Store. Free-account builds
   only run on your own devices and expire after 7 days.
 - **Revisit the Menu button for App Store review.** Apple's guidelines expect Menu to leave the app from its top

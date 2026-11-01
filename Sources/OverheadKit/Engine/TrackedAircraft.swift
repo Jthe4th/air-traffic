@@ -6,10 +6,20 @@ public struct TrailPoint: Hashable, Sendable {
     public var time: Date
 }
 
+/// Where the search for an aircraft's route has got to.
+public enum RouteStatus: Sendable {
+    case checking
+    case found
+    /// A database lists a route for the callsign, but this aircraft doesn't fit it (callsigns are reused).
+    case unconfirmed
+    case unavailable
+}
+
 /// An aircraft plus everything we've learned about it while it's been in range.
 public struct TrackedAircraft: Identifiable, Hashable, Sendable {
     public var aircraft: Aircraft
     public var route: FlightRoute?
+    public var routeStatus = RouteStatus.checking
     public var photo: AircraftPhoto?
     public var trail: [TrailPoint] = []
     public var firstSeen: Date

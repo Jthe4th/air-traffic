@@ -245,14 +245,27 @@ private struct RouteBlock: View {
                 .font(Theme.body(23)).foregroundStyle(Theme.secondary)
             }
         } else {
+            let (headline, note) = noRouteText
             HStack(spacing: 14) {
                 Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
                     .font(.system(size: 26, weight: .medium)).foregroundStyle(Theme.tertiary)
-                Text(tracked.airline != nil ? "Route not available" : "Private or unscheduled flight")
-                    .font(Theme.serif(29)).italic().foregroundStyle(Theme.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(headline).font(Theme.serif(29)).italic().foregroundStyle(Theme.secondary)
+                    if let note { Text(note).font(Theme.body(21)).foregroundStyle(Theme.tertiary) }
+                }
                 Spacer()
             }
             .padding(.vertical, 14)
+        }
+    }
+
+    /// Why there is no route, in the viewer's terms. Route databases keep one route per flight number, so a listed route can
+    /// be for another trip: that is "unconfirmed", not wrong data to show.
+    private var noRouteText: (String, String?) {
+        switch tracked.routeStatus {
+        case .checking: ("Checking route…", nil)
+        case .unconfirmed: ("Route unconfirmed", "Listed for a different trip")
+        case .found, .unavailable: (tracked.airline != nil ? "Route not available" : "Private or unscheduled flight", nil)
         }
     }
 

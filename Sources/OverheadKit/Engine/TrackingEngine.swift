@@ -36,7 +36,7 @@ public final class TrackingEngine {
     @ObservationIgnored private var feed: any AircraftFeed = DemoFeed()
     @ObservationIgnored private var routes: any RouteProviding = DemoRouteProvider()
     @ObservationIgnored private var photos: any PhotoProviding = NoPhotos()
-    @ObservationIgnored private let liveRoutes = StandingDataRouteProvider()
+    @ObservationIgnored private let liveRoutes = LiveRouteProvider()
     @ObservationIgnored private let livePhotos = PlanespottersPhotoProvider()
     @ObservationIgnored private var pollTask: Task<Void, Never>?
     @ObservationIgnored private var tickTask: Task<Void, Never>?
@@ -451,9 +451,16 @@ public final class TrackingEngine {
                 aircraft[i].routeCheckedAt = now
                 let provider = routes
                 Task { [weak self] in
-                    let route = await provider.route(for: snapshot)
-                    guard let route else { return }
-                    self?.update(id) { $0.route = route }
+                    let result = await provider.lookup(for: snapshot)
+                    self?.update(id) { t in
+                        switch result {
+                        case .found(let route): t.route = route; t.routeStatus = .found
+                        case .unconfirmed: t.routeStatus = .unconfirmed
+                        case .unavailable: t.routeStatus = .unavailable
+                        // Couldn't ask this time: keep any earlier answer, and don't claim to be still checking.
+                        case .failed: if t.routeStatus == .checking { t.routeStatus = .unavailable }
+                        }
+                    }
                 }
             }
             if aircraft[i].photo == nil, !aircraft[i].photoRequested {

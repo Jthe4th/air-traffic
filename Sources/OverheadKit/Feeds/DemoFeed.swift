@@ -87,10 +87,10 @@ public struct DemoFeed: AircraftFeed {
 public struct DemoRouteProvider: RouteProviding {
     public init() {}
 
-    public func route(for aircraft: Aircraft) async -> FlightRoute? {
-        guard let cs = aircraft.displayCallsign, let pair = Self.pairs[cs] else { return nil }
-        return FlightRoute(origin: Self.airports[pair.0]!, destination: Self.airports[pair.1]!,
-                           flightNumber: Airlines.flightNumber(forCallsign: cs))
+    public func lookup(for aircraft: Aircraft) async -> RouteLookup {
+        guard let cs = aircraft.displayCallsign, let pair = Self.pairs[cs] else { return .unavailable }
+        return .found(FlightRoute(origin: Self.airports[pair.0]!, destination: Self.airports[pair.1]!,
+                                  flightNumber: Airlines.flightNumber(forCallsign: cs)))
     }
 
     static let pairs: [String: (String, String)] = [

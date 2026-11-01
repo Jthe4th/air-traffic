@@ -51,8 +51,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.feezerj.AirTraffic
         # Version. Apple's version field allows only digits and dots, so the "-beta" in "1.0.1-beta" is the
         # AT_RELEASE_CHANNEL label, shown next to the number in the app. Bump these together; see CHANGELOG.md.
-        MARKETING_VERSION: "1.1.2"
-        CURRENT_PROJECT_VERSION: "4"
+        MARKETING_VERSION: "1.1.3"
+        CURRENT_PROJECT_VERSION: "5"
         AT_RELEASE_CHANNEL: beta
         TARGETED_DEVICE_FAMILY: "3"
         ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"

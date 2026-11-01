@@ -192,7 +192,7 @@ private func aircraft(at p: GeoPoint, track: Double, gs: Double = 400, alt: Int 
          {"name":"Chicago O'Hare International Airport","icao":"KORD","iata":"ORD","location":"Chicago","countryiso2":"US","lat":41.9786,"lon":-87.9048,"alt_feet":672.0},
          {"name":"Nashville International Airport","icao":"KBNA","iata":"BNA","location":"Nashville","countryiso2":"US","lat":36.1245,"lon":-86.6782,"alt_feet":599.0}]}
         """
-        let airports = try #require(StandingDataRouteProvider.parse(Data(json.utf8)))
+        let airports = try #require(StandingDataSource.parse(Data(json.utf8)))
         #expect(airports.map(\.code) == ["ORD", "BNA"])
         #expect(airports[0].city == "Chicago")
     }

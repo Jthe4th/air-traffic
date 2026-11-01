@@ -4,10 +4,27 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 and versions follow [Semantic Versioning](https://semver.org/).
 
 Pre-release builds are labelled `-beta`. Apple's bundle version field allows only digits and dots, so the app's
-`CFBundleShortVersionString` holds the number (`1.1.2`) and the label lives in `AT_RELEASE_CHANNEL`
-([project.yml](project.yml)); the app, this file and the git tags show them together (`1.1.2-beta`).
+`CFBundleShortVersionString` holds the number (`1.1.3`) and the label lives in `AT_RELEASE_CHANNEL`
+([project.yml](project.yml)); the app, this file and the git tags show them together (`1.1.3-beta`).
 
 ## [Unreleased]
+
+## [1.1.3-beta] - 2026-11-01
+
+### Added
+- **A second source for flight routes.** When ADSB.lol's standing data has no route for a callsign, or lists one the
+  aircraft doesn't fit, the app asks adsbdb.com. In a live check of 64 flights near the viewer it raised the number with
+  a route from 31 to 37 (48% to 58%); the rest are mostly flight numbers listed for another trip. Its answers go through the same check as the first source (the aircraft's position and heading must
+  fit the route), so a listed route is still never shown just because a database says so. Only the callsign is sent.
+
+### Changed
+- **The route line on the aircraft card now says why there is no route**, instead of "Route not available" for everything.
+  While the lookup is in progress it says "Checking route…" (it used to say "Route not available" for the first few
+  seconds); when a database lists a route for that flight number but the aircraft isn't on it (flight numbers are reused for
+  other trips, Southwest's especially) it says "Route unconfirmed · Listed for a different trip"; and "Route not available"
+  is kept for an airline flight no database knows. Private and unscheduled flights are unchanged.
+- 17 new tests (185 in all). Each of the new behaviours (asking the second source, validating what it says, the four
+  outcomes and the status the engine records) was broken on purpose to confirm a test fails.
 
 ## [1.1.2-beta] - 2026-11-01
 
@@ -154,7 +171,8 @@ First beta. tvOS only, installed from Xcode with a free Apple ID.
 - Free-account builds expire after 7 days and must be reinstalled from Xcode.
 - Remote focus behaviour of the zoom buttons has not yet been confirmed on a real Apple TV.
 
-[Unreleased]: https://github.com/Jthe4th/air-traffic/compare/v1.1.2-beta...HEAD
+[Unreleased]: https://github.com/Jthe4th/air-traffic/compare/v1.1.3-beta...HEAD
+[1.1.3-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.1.2-beta...v1.1.3-beta
 [1.1.2-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.1.1-beta...v1.1.2-beta
 [1.1.1-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.1.0-beta...v1.1.1-beta
 [1.1.0-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.0.1-beta...v1.1.0-beta

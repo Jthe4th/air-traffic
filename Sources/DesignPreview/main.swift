@@ -10,6 +10,7 @@ import OverheadUI
 //   design-preview --chimes <dir>                 the Space Station sounds as WAV files
 //   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading, alert, flyby, ambient (append 2 or 3 for later telemetry pages),
 //                                                 issupcoming, issimminent, issnow, issover, issquiet (the Space Station, from its real orbit)
+//                                                 routechecking, routeunconfirmed, routenone (the route line when there is no route)
 // Needs network access for map tiles on first run (cached afterwards by URLCache).
 
 @MainActor
@@ -80,7 +81,22 @@ func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEn
         let photo: AircraftPhoto
         func photo(for aircraft: Aircraft) async -> AircraftPhoto? { aircraft.hex == "a5c8b9" ? nil : photo }
     }
-    let engine = TrackingEngine(settings: settings, persists: false, photos: Photos(photo: photo))
+    /// What the route lookup says in the route scenes: nil never answers, so the card stays on "Checking route…".
+    struct FixedRoutes: RouteProviding {
+        let result: RouteLookup?
+        func lookup(for aircraft: Aircraft) async -> RouteLookup {
+            if let result { return result }
+            try? await Task.sleep(for: .seconds(3600))
+            return .failed
+        }
+    }
+    let routes: FixedRoutes? = switch scene {
+    case "routechecking": FixedRoutes(result: nil)
+    case "routeunconfirmed": FixedRoutes(result: .unconfirmed)
+    case "routenone": FixedRoutes(result: .unavailable)
+    default: nil
+    }
+    let engine = TrackingEngine(settings: settings, persists: false, routes: routes, photos: Photos(photo: photo))
     var flights = DemoFeed.snapshot(center: engine.home, radiusNM: DemoFeed.loopRadiusNM, at: date)
     if scene == "crowded" { flights += crowd(around: engine.home, count: 110, at: date) }
     if scene == "quiet" || scene == "issquiet" { flights = [] }
@@ -101,7 +117,7 @@ func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEn
         engine.ingest(flights, at: date.addingTimeInterval(-20))
     }
     engine.ingest(flights, at: date)
-    if scene == "busy" || scene == "nophoto" || scene == "photoloading" { engine.pin(scene == "nophoto" ? "a5c8b9" : "a8b001", now: date) }
+    if scene == "busy" || scene == "nophoto" || scene == "photoloading" || scene.hasPrefix("route") { engine.pin(scene == "nophoto" ? "a5c8b9" : "a8b001", now: date) }
     try? await Task.sleep(for: .milliseconds(400))   // let route/photo lookups land
     if let id = engine.featuredID, let t = engine.aircraft.first(where: { $0.id == id }), let url = t.photo?.imageURL {
         await ImageStore.shared.load(url)

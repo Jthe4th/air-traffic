@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Jthe4th/air-traffic/actions/workflows/ci.yml/badge.svg)](https://github.com/Jthe4th/air-traffic/actions/workflows/ci.yml)
 
-**Version 1.1.2-beta** · tvOS · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Notes for contributors and AI agents](AGENTS.md)
+**Version 1.1.3-beta** · tvOS · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Notes for contributors and AI agents](AGENTS.md)
 
 A living-room display for Apple TV that shows the aircraft flying near your home: a dark live map, the plane
 that's closest or overhead featured in detail (photo, airline, route, progress, altitude, speed, vertical rate,
@@ -96,9 +96,10 @@ Tests/OverheadKitTests  unit tests, including an anonymised adsb.fi capture
 - **Space Station:** orbital elements from CelesTrak, propagated with SGP4 and checked against independent software.
   Only the station's catalogue number is requested, so your location is never sent for it. Passes are searched ten days
   ahead from your home; the Sun and Earth's shadow decide whether a pass is visible. See `Sources/OverheadKit/Space`.
-- **Routes:** ADSB.lol standing data per callsign, shown only if the plane's position and heading actually fit
-  the route. Callsigns get reused (the database says UAL2850 is SFO→ONT even when it's flying near Dulles),
-  so a wrong route is rejected rather than displayed. See `RouteValidator`.
+- **Routes:** ADSB.lol standing data per callsign, then adsbdb.com for callsigns the first doesn't know or lists for
+  another trip. A route is shown only if the plane's position and heading actually fit it. Callsigns get reused (the
+  database says UAL2850 is SFO→ONT even when it's flying near Dulles), so a wrong route is rejected rather than
+  displayed, and the card says "Route unconfirmed" rather than guessing. Only the callsign is sent. See `RouteValidator`.
 - **Maps:** OpenStreetMap raster tiles (your viewed area is visible to the tile server). Keep personal-scale.
 - **Check each provider's current terms.** adsb.fi's open API is for personal, non-commercial use.
   (airplanes.live now requires contacting them for API access, so it isn't used.)
@@ -126,7 +127,8 @@ Inspired by [Overhead](https://github.com/alexlmiller/overhead) by alexlmiller (
 display for Home Assistant and browsers. Air Traffic is an independent Swift implementation for Apple TV and shares
 no code with it. It borrows a few ideas: a calm display built around the nearest aircraft with recent sightings,
 and rejecting a reported route unless the aircraft's position and heading fit it. Space Station orbital data is from
-[CelesTrak](https://celestrak.org).
+[CelesTrak](https://celestrak.org). Second-source flight routes are from [adsbdb](https://github.com/mrjackwills/adsbdb)
+(MIT), whose route data is the work of David Taylor and Jim Mason.
 
 ## License
 
