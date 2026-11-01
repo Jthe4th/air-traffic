@@ -9,12 +9,14 @@ public enum AircraftKind: String, Sendable {
     case lightPiston = "Light aircraft"
     case helicopter = "Helicopter"
     case military = "Military"
+    case spacecraft = "Space station"
     case other = "Aircraft"
 
-    public enum Silhouette: Sendable { case jet, prop, helicopter }
+    public enum Silhouette: Sendable { case jet, prop, helicopter, station }
 
     public var silhouette: Silhouette {
         switch self {
+        case .spacecraft: .station
         case .helicopter: .helicopter
         case .turboprop, .lightPiston: .prop
         default: .jet
@@ -56,11 +58,12 @@ public enum AircraftTypes {
 
     private static let kinds: [String: AircraftKind] = [
         "nb": .narrowBody, "wb": .wideBody, "rj": .regionalJet, "tp": .turboprop,
-        "bj": .businessJet, "lp": .lightPiston, "he": .helicopter, "mil": .military,
+        "bj": .businessJet, "lp": .lightPiston, "he": .helicopter, "mil": .military, "sc": .spacecraft,
     ]
 
     // code|name|kind
     private static let source = """
+    ISS|International Space Station|sc
     A318|Airbus A318|nb
     A319|Airbus A319|nb
     A320|Airbus A320|nb

@@ -37,7 +37,7 @@ public struct FlybyPass: Hashable, Sendable {
 
 public enum Flyby {
     public static func evaluate(_ a: Aircraft, home: GeoPoint, heading: Double?, at now: Date, config: FlybyConfig) -> FlybyPass? {
-        guard !a.onGround, let altitude = a.altitudeFt(at: now) else { return nil }
+        guard !a.onGround, !a.isSpacecraft, let altitude = a.altitudeFt(at: now) else { return nil }
         if config.maxAltitudeFt > 0, altitude > Double(config.maxAltitudeFt) { return nil }
 
         let rel = a.relative(to: home, at: now)

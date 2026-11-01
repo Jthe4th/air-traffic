@@ -48,6 +48,10 @@ Shipped work is in [CHANGELOG.md](CHANGELOG.md).
   - *Caveats:* streams are often plain `http` (needs an App Transport Security exception, a mark against App Store
     release) and run behind real time, so the audio won't match the map exactly. Transcribing calls isn't practical:
     Apple's speech recognition is unavailable on tvOS, and the alternatives are heavy or need an account.
+- **More bright satellites** through the same orbit machinery as the Space Station: China's space station, Hubble and
+  newly launched Starlink trains, from CelesTrak's "visual" list. An alert for a phone would need an iPhone companion app
+  (tvOS cannot show banners), so it is not planned.
+- **Cloud cover for Space Station passes:** skip the warning when the sky is overcast (needs a weather source).
 - **Refine the home location by moving a pin on the map,** for addresses Apple Maps places a little off (long
   driveways, new builds). A street address or pasted coordinates work today.
 - **Flyby cards that adapt:** quiet hours, a stronger "straight overhead" treatment, a lead time you can set, and

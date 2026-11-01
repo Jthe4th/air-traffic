@@ -107,6 +107,15 @@ fail (write it, watch it fail, then fix).
 - **Altitude:** `barometricAltitudeFt` is *pressure* altitude (1013.25 hPa), which reads below zero near sea level on a
   high-pressure day. `Aircraft.altitudeFt` is the corrected, never-negative number; the engine sets `qnhCorrectionFt` at
   ingest from the median `nav_qnh` of low aircraft (`Altimetry`). Use `altitudeFt`, never the raw field, for display.
+- **Space Station:** the orbit is computed on the TV (`Sources/OverheadKit/Space`): `SGP4` (near-Earth only; deep-space
+  orbits are refused) from CelesTrak elements, `Sky` for time, frames, Sun and shadow, `PassFinder` for visible passes
+  (10° up, Sun below -6°, station sunlit, peak at least 20°). The engine adds the station to `aircraft` once a second while
+  it is within range, flagged by `Aircraft.spacecraft`; everything that assumes an aircraft (routes, photos, flyby
+  cards, projection lines, feet and knots) checks `isSpacecraft`. `ingest` must not let it coast between feed reports
+  (it moves 4 NM a second). Only the catalogue number is ever sent to CelesTrak. Tests and previews stay off the network
+  unless they pass an `orbits:` provider. Reference numbers in `SpaceTests.swift` came from python-sgp4 and Skyfield with
+  DE421 (a throwaway venv, nothing added to the repo); after changing the maths, regenerate them the same way, don't loosen
+  the tolerances. A pass card never claims a pass is visible unless the Sun, shadow and sky all agree.
 - **Menu button:** the main screen deliberately swallows Menu (`onExitCommand` in `TVDashboardView`) so it can't close
   an always-on display; Settings is left to dismiss itself. This may conflict with App Store review (see ROADMAP).
 - **Focus:** use `FlatButtonStyle` and read `@Environment(\.isFocused)` inside the label, so tvOS's built-in lift

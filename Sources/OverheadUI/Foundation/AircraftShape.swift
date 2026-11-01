@@ -14,6 +14,7 @@ enum Silhouettes {
             (0.09, 0.58), (0.40, 0.76), (0.40, 0.92), (0.06, 0.86), (0.00, 0.96),
         ])
         case .helicopter: helicopter()
+        case .station: station()
         }
     }
 
@@ -39,6 +40,19 @@ enum Silhouettes {
         return p
     }
 
+    /// The Space Station from above, flying nose-up: the truss runs across the direction of travel, the solar arrays are the
+    /// four wide panels, and the pressurised modules run along it.
+    private static func station() -> Path {
+        var p = Path()
+        p.addRect(CGRect(x: -0.97, y: -0.04, width: 1.94, height: 0.08))                    // main truss
+        p.addRect(CGRect(x: -0.06, y: -0.66, width: 0.12, height: 1.16))                    // modules
+        for x in [-0.80, -0.44, 0.44, 0.80] {                                                  // solar arrays
+            p.addRect(CGRect(x: x - 0.10, y: -0.46, width: 0.20, height: 0.92))
+        }
+        p.addRect(CGRect(x: -0.22, y: 0.18, width: 0.44, height: 0.07))                     // radiator
+        return p
+    }
+
     static func path(_ kind: AircraftKind.Silhouette, center: CGPoint, size: CGFloat, headingDeg: Double) -> Path {
         let t = CGAffineTransform(translationX: center.x, y: center.y)
             .rotated(by: headingDeg * .pi / 180)
@@ -53,6 +67,7 @@ enum Silhouettes {
         case .small: 27
         case .light, .ultralight, .glider: 23
         case .rotorcraft: 28
+        case .spaceVehicle: 42
         default: 28
         }
         return featured ? base * 1.3 : base

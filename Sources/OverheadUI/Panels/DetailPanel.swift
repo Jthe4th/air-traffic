@@ -47,10 +47,10 @@ private struct PhotoHeader: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
         let a = tracked.aircraft
-        let tint = Theme.altitudeColor(a.altitudeFt.map(Double.init), onGround: a.onGround)
+        let tint = a.isSpacecraft ? Theme.station : Theme.altitudeColor(a.altitudeFt.map(Double.init), onGround: a.onGround)
         ZStack(alignment: .topLeading) {
             // The backdrop is always there, so the photo fades in over it instead of over an empty box.
-            backdrop(tint: tint)
+            if a.isSpacecraft { spaceBackdrop } else { backdrop(tint: tint) }
             if let photo = tracked.photo {
                 CachedImage(url: photo.imageURL)
                     .frame(width: DetailPanel.width - 56, height: 230)
@@ -98,6 +98,30 @@ private struct PhotoHeader: View {
         .frame(width: DetailPanel.width - 56, height: 230)
     }
 
+    /// Night sky with the Earth's limb glowing along the bottom, and the station itself.
+    private var spaceBackdrop: some View {
+        ZStack {
+            LinearGradient(colors: [Color(red: 0.02, green: 0.04, blue: 0.12), Color(red: 0.05, green: 0.09, blue: 0.22)], startPoint: .top, endPoint: .bottom)
+            Canvas { ctx, size in
+                var seed: UInt64 = 0x2545F4914F6CDD1D
+                func next() -> Double { seed = seed &* 6364136223846793005 &+ 1442695040888963407; return Double(seed >> 33) / Double(1 << 31) }
+                for _ in 0..<70 {
+                    let r = 0.8 + next() * 1.6
+                    ctx.fill(Path(ellipseIn: CGRect(x: next() * size.width, y: next() * size.height * 0.85, width: r, height: r)),
+                             with: .color(.white.opacity(0.25 + next() * 0.6)))
+                }
+            }
+            Ellipse()
+                .fill(RadialGradient(colors: [Color(red: 0.25, green: 0.55, blue: 1.0).opacity(0.55), Color(red: 0.1, green: 0.25, blue: 0.6).opacity(0.0)],
+                                     center: .center, startRadius: 40, endRadius: 330))
+                .frame(width: 900, height: 340)
+                .offset(y: 190)
+            SilhouetteView(kind: .station).fill(Theme.station.opacity(0.22)).frame(width: 250, height: 250).rotationEffect(.degrees(-24)).offset(x: 130, y: -6)
+            SilhouetteView(kind: .station).stroke(Theme.station.opacity(0.6), lineWidth: 2).frame(width: 250, height: 250).rotationEffect(.degrees(-24)).offset(x: 130, y: -6)
+        }
+        .frame(width: DetailPanel.width - 56, height: 230)
+    }
+
     @ViewBuilder private var statusChip: some View {
         if tracked.aircraft.onGround {
             chip("ON THE GROUND", color: Theme.secondary)
@@ -125,6 +149,25 @@ private struct IdentityBlock: View {
 
     var body: some View {
         let a = tracked.aircraft
+        if let craft = a.spacecraft {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 18) {
+                    AirlineBadge(size: 80, spacecraft: true)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Crewed spacecraft").labelStyle(Theme.secondary).lineLimit(1)
+                        Text(a.title).font(Theme.serif(68)).foregroundStyle(Theme.text)
+                    }
+                    Spacer(minLength: 0)
+                }
+                HStack(spacing: 12) {
+                    Text(craft.name).font(Theme.body(30, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1).minimumScaleFactor(0.65)
+                    Spacer(minLength: 0)
+                    Text("IN ORBIT").font(.system(size: 18, weight: .bold)).tracking(1.2).foregroundStyle(Theme.station)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .overlay(Capsule().strokeBorder(Theme.station.opacity(0.8), lineWidth: 1.5))
+                }
+            }
+        } else {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 18) {
                 AirlineBadge(airline: tracked.airline, fallbackText: a.registration.map { String($0.prefix(2)) } ?? "", size: 80)
@@ -156,6 +199,7 @@ private struct IdentityBlock: View {
                 }
             }
         }
+        }
     }
 
     private func tags(_ a: Aircraft) -> [(String, Color)] {
@@ -176,7 +220,15 @@ private struct RouteBlock: View {
     let units: UnitSystem
 
     var body: some View {
-        if let route = tracked.route {
+        if let craft = tracked.aircraft.spacecraft {
+            HStack(spacing: 14) {
+                Image(systemName: "globe.americas.fill").font(.system(size: 28, weight: .medium)).foregroundStyle(Theme.tertiary)
+                Text("Circles the Earth every \(Int(craft.periodMinutes.rounded())) minutes")
+                    .font(Theme.serif(29)).italic().foregroundStyle(Theme.secondary).lineLimit(1).minimumScaleFactor(0.7)
+                Spacer()
+            }
+            .padding(.vertical, 14)
+        } else if let route = tracked.route {
             let progress = route.progress(position: tracked.aircraft.position(at: now), groundSpeedKt: tracked.aircraft.groundSpeedKt)
             VStack(spacing: 8) {
                 HStack(alignment: .top) {

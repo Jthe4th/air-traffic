@@ -15,6 +15,7 @@ struct Fact: Identifiable {
 enum AircraftFacts {
     static func pages(_ t: TrackedAircraft, home: GeoPoint, now: Date, units: UnitSystem) -> [[Fact]] {
         let rel = t.aircraft.relative(to: home, at: now)
+        if let craft = t.aircraft.spacecraft { return [orbit(t, craft: craft, rel: rel, units: units)] }
         var pages = [essentials(t, rel: rel, now: now, units: units)]
         let extra = extras(t, now: now, units: units)
         var rest = extra[...]
@@ -24,6 +25,36 @@ enum AircraftFacts {
             if chunk.count >= 3 || pages.count == 1 { pages.append(chunk) }
         }
         return pages
+    }
+
+    /// A spacecraft's tiles: height and speed in the viewer's units, not feet and knots, and whether the Sun is on it.
+    static func orbit(_ t: TrackedAircraft, craft: SpacecraftInfo, rel: Relative, units: UnitSystem) -> [Fact] {
+        let a = t.aircraft
+        var out: [Fact] = []
+        let height = units.distance(nm: craft.altitudeKm / Geo.kmPerNM)
+        out.append(Fact(label: "Altitude", value: height.value, unit: height.unit, note: "Above the surface"))
+        let speed = units.speed(kt: craft.orbitalSpeedKmS * 3600 / Geo.kmPerNM)
+        out.append(Fact(label: "Speed", value: speed.value, unit: speed.unit, note: "Orbital speed"))
+        if let track = a.trackDeg {
+            out.append(Fact(label: "Heading", value: String(format: "%.0f°", track), note: "Bound \(Geo.compass(track))"))
+        }
+        let d = units.distance(nm: rel.distanceNM)
+        var dnote = "\(Geo.compass(rel.bearingDeg)) of you"
+        if let e = rel.elevationDeg, e >= 2 { dnote += " · \(Int(e.rounded()))° up" }
+        out.append(Fact(label: "Distance", value: d.value, unit: d.unit, note: dnote))
+        if let cpa = rel.closestApproach {
+            if cpa.movingAway {
+                out.append(Fact(label: "Closest", value: "Leaving", note: "Heading away", tint: Theme.secondary))
+            } else {
+                let close = units.distance(nm: cpa.distanceNM)
+                out.append(Fact(label: "Closest", value: clockInterval(cpa.seconds), unit: "min",
+                                note: cpa.distanceNM < 0.4 ? "Directly overhead" : "Passes \(close.text) away",
+                                tint: cpa.distanceNM < 1.5 ? Theme.accent : Theme.text))
+            }
+        }
+        out.append(Fact(label: "Sunlight", value: craft.isSunlit ? "Lit" : "Shadow",
+                        note: craft.isSunlit ? "Sun on the station" : "In Earth's shadow", tint: craft.isSunlit ? Theme.station : Theme.secondary))
+        return out
     }
 
     static func essentials(_ t: TrackedAircraft, rel: Relative, now: Date, units: UnitSystem) -> [Fact] {

@@ -54,6 +54,23 @@ public enum WakeClass: String, Sendable {
     }
 }
 
+/// What makes a tracked object a spacecraft rather than an aircraft: it is in orbit, so altitude is hundreds of kilometres and
+/// speed is thousands of miles an hour. Aircraft that carry this skip routes, photos and flyby cards.
+public struct SpacecraftInfo: Hashable, Sendable {
+    public var name: String
+    public var altitudeKm: Double
+    /// Speed through space, not over the ground.
+    public var orbitalSpeedKmS: Double
+    public var periodMinutes: Double
+    /// Whether the Sun is shining on it (it can be in Earth's shadow even when it is overhead).
+    public var isSunlit: Bool
+
+    public init(name: String, altitudeKm: Double, orbitalSpeedKmS: Double, periodMinutes: Double, isSunlit: Bool) {
+        self.name = name; self.altitudeKm = altitudeKm; self.orbitalSpeedKmS = orbitalSpeedKmS
+        self.periodMinutes = periodMinutes; self.isSunlit = isSunlit
+    }
+}
+
 /// One decoded ADS-B/Mode-S position report plus whatever the feed knows about the airframe.
 public struct Aircraft: Identifiable, Hashable, Sendable {
     public var id: String { hex }
@@ -96,6 +113,8 @@ public struct Aircraft: Identifiable, Hashable, Sendable {
     public var altimeterSettingHPa: Double?
     /// Added to the barometric (pressure) altitude to get altitude above sea level; set from the area's pressure setting.
     public var qnhCorrectionFt = 0
+    /// Set for the Space Station, which the engine adds from its orbit rather than from an aircraft feed.
+    public var spacecraft: SpacecraftInfo?
 
     public init(
         hex: String, callsign: String? = nil, registration: String? = nil, typeCode: String? = nil,
@@ -108,7 +127,7 @@ public struct Aircraft: Identifiable, Hashable, Sendable {
         magneticHeadingDeg: Double? = nil, rollDeg: Double? = nil, selectedAltitudeFt: Int? = nil,
         selectedHeadingDeg: Double? = nil, autopilotModes: [String] = [], windDirectionDeg: Double? = nil,
         windSpeedKt: Double? = nil, outsideAirTempC: Double? = nil, sourceType: String? = nil,
-        altimeterSettingHPa: Double? = nil
+        altimeterSettingHPa: Double? = nil, spacecraft: SpacecraftInfo? = nil
     ) {
         self.hex = hex; self.callsign = callsign; self.registration = registration; self.typeCode = typeCode
         self.typeDescription = typeDescription; self.operatorName = operatorName; self.yearBuilt = yearBuilt
@@ -121,7 +140,7 @@ public struct Aircraft: Identifiable, Hashable, Sendable {
         self.selectedAltitudeFt = selectedAltitudeFt; self.selectedHeadingDeg = selectedHeadingDeg
         self.autopilotModes = autopilotModes; self.windDirectionDeg = windDirectionDeg
         self.windSpeedKt = windSpeedKt; self.outsideAirTempC = outsideAirTempC; self.sourceType = sourceType
-        self.altimeterSettingHPa = altimeterSettingHPa
+        self.altimeterSettingHPa = altimeterSettingHPa; self.spacecraft = spacecraft
     }
 
     /// Altitude above sea level, never negative. Barometric altitude is pressure altitude, so it is corrected for the local
@@ -132,6 +151,7 @@ public struct Aircraft: Identifiable, Hashable, Sendable {
         return max(0, baro + qnhCorrectionFt)
     }
     public var isMoving: Bool { (groundSpeedKt ?? 0) > 5 }
+    public var isSpacecraft: Bool { spacecraft != nil }
 
     /// Dead-reckoned position, so markers glide between 5-second feed updates.
     public func position(at date: Date) -> GeoPoint {
@@ -172,7 +192,9 @@ extension Aircraft {
         let d = Geo.distanceNM(home, p)
         let brg = Geo.bearing(from: home, to: p)
         let alt = altitudeFt(at: date)
-        let elev = alt.map { Geo.elevationAngle(heightFt: $0, groundDistanceNM: d) }
+        // At orbital height the aircraft formula's rough allowance for curvature is a degree or more out; this one is exact.
+        let elev = spacecraft.map { Geo.sphericalElevation(heightKm: $0.altitudeKm, groundDistanceNM: d) }
+            ?? alt.map { Geo.elevationAngle(heightFt: $0, groundDistanceNM: d) }
         var cpa: ClosestApproach?
         var approaching: Bool?
         if let track = trackDeg, let gs = groundSpeedKt, gs > 20, !onGround {

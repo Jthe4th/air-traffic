@@ -201,9 +201,7 @@ struct MapPainter {
 
     // MARK: Aircraft
 
-    private func color(for t: TrackedAircraft) -> Color {
-        Theme.altitudeColor(t.aircraft.altitudeFt(at: now), onGround: t.aircraft.onGround)
-    }
+    private func color(for t: TrackedAircraft) -> Color { Theme.tint(t.aircraft, at: now) }
 
     private func visible(_ p: CGPoint, margin: CGFloat = 80) -> Bool {
         p.x > -margin && p.y > -margin && p.x < camera.size.width + margin && p.y < camera.size.height + margin
@@ -228,7 +226,7 @@ struct MapPainter {
 
     private func paintProjection(_ ctx: inout GraphicsContext, _ t: TrackedAircraft) {
         let a = t.aircraft
-        guard !a.onGround, let track = a.trackDeg, let gs = a.groundSpeedKt, gs > 40 else { return }
+        guard !a.onGround, !a.isSpacecraft, let track = a.trackDeg, let gs = a.groundSpeedKt, gs > 40 else { return }
         let start = a.position(at: now)
         let tint = color(for: t)
         let end = Geo.destination(from: start, bearing: track, distanceNM: gs * 6 / 60)
@@ -311,6 +309,7 @@ struct MapPainter {
         let tint = color(for: t)
         let name = t.flightNumber ?? a.title
         let alt: String = {
+            if a.isSpacecraft { return "In orbit" }
             if a.onGround { return "On ground" }
             guard let ft = a.altitudeFt(at: now) else { return "" }
             return flightLevelText(altitudeFt: Int(ft)) ?? settings.units.altitude(ft: ft).text

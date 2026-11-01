@@ -107,6 +107,15 @@ public enum Geo {
         let apparent = heightNM - (groundDistanceNM * groundDistanceNM) / (2 * earthRadiusNM)
         return deg(atan2(apparent, max(groundDistanceNM, 0.001)))
     }
+
+    /// Angle above the horizon of something `heightKm` up, seen from `groundDistanceNM` away along the surface, on a round Earth.
+    /// For high things such as satellites; `elevationAngle` is the simpler version for aircraft, which allows for curvature only roughly.
+    public static func sphericalElevation(heightKm: Double, groundDistanceNM: Double) -> Double {
+        let radius = earthRadiusNM * kmPerNM
+        let central = groundDistanceNM * kmPerNM / radius
+        let r = radius + heightKm
+        return deg(atan2(r * cos(central) - radius, r * sin(central)))
+    }
 }
 
 public struct ClosestApproach: Hashable, Sendable {

@@ -11,6 +11,7 @@ struct SettingsView: View {
                 locationSection
                 displaySection
                 flybySection
+                stationSection
                 dataSection
                 photosSection
                 diagnosticsSection
@@ -108,6 +109,59 @@ struct SettingsView: View {
             Text("Close flybys")
         } footer: {
             Text("A card says when an aircraft will pass close and which way to look.\n1. Enter your street address under Location above.\n2. Choose which way you face when you watch TV, from your seat toward the screen, so \"ahead\" is past the TV.\n3. Optionally name each side after a door or window.\nThen show the sample card: it shows a plane due north, so check it against a compass app.")
+        }
+    }
+
+    private var stationSection: some View {
+        let status = engine.stationStatus()
+        return Section {
+            Toggle("Watch for the Space Station", isOn: $engine.settings.issEnabled)
+            if engine.settings.issEnabled {
+                ChoiceRow(title: "Warn me", selection: $engine.settings.issLeadMinutes,
+                          choices: AppSettings.issLeadChoices.map { ("\($0) minutes before", $0) })
+                Toggle("Play a chime", isOn: $engine.settings.issChime)
+                if case .demo = status {
+                    Text("Set your location (above) to see when the Space Station passes over your home.").foregroundStyle(.orange)
+                } else {
+                    LabeledContent("Next visible pass", value: nextPassText(status))
+                    LabeledContent("Orbit data", value: orbitDataText(status))
+                }
+                // Without a home the welcome card is on screen and would sit on top of the sample.
+                if engine.settings.home != nil {
+                    Button {
+                        engine.showSampleStationPass()
+                        dismiss()
+                    } label: {
+                        Label("Show a sample card", systemImage: "sparkles")
+                    }
+                }
+            }
+        } header: {
+            Text("Space Station")
+        } footer: {
+            Text("A card appears before the Space Station crosses your sky after dark, with where to look, and a chime as it begins. Whenever it flies over your home, in daylight too, it shows on the map like an aircraft. Its orbit is downloaded from CelesTrak, which is told nothing about where you are.")
+        }
+    }
+
+    private func nextPassText(_ status: StationStatus) -> String {
+        switch status {
+        case .ready:
+            guard let pass = engine.nextStationPass() else { return "None in the next 10 days" }
+            return StationPassCard.whenText(for: pass, now: Date())
+        case .waiting: return "Waiting for orbit data"
+        case .outdated: return "Orbit data too old"
+        case .failed: return "Unavailable"
+        case .off, .demo: return "n/a"
+        }
+    }
+
+    private func orbitDataText(_ status: StationStatus) -> String {
+        switch status {
+        case .ready(let epoch): return "Current (from \(epoch.formatted(.dateTime.month(.abbreviated).day())))"
+        case .outdated(let epoch): return "From \(epoch.formatted(.dateTime.month(.abbreviated).day())); needs a connection"
+        case .waiting: return "Downloading…"
+        case .failed(let message): return message
+        case .off, .demo: return "n/a"
         }
     }
 

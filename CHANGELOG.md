@@ -4,10 +4,33 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 and versions follow [Semantic Versioning](https://semver.org/).
 
 Pre-release builds are labelled `-beta`. Apple's bundle version field allows only digits and dots, so the app's
-`CFBundleShortVersionString` holds the number (`1.1.1`) and the label lives in `AT_RELEASE_CHANNEL`
-([project.yml](project.yml)); the app, this file and the git tags show them together (`1.1.1-beta`).
+`CFBundleShortVersionString` holds the number (`1.1.2`) and the label lives in `AT_RELEASE_CHANNEL`
+([project.yml](project.yml)); the app, this file and the git tags show them together (`1.1.2-beta`).
 
 ## [Unreleased]
+
+## [1.1.2-beta] - 2026-11-01
+
+### Added
+- **International Space Station.** About 15 minutes before the station will be visible from your home (a bright, fast
+  star crossing the sky after dark, lit by the Sun while your sky is dark and at least 20° above the horizon), a slim
+  card says when and which way to look. In the last two minutes and during the pass it grows into a full card with a
+  sky chart: when and where it appears, its highest point, where it sets or fades into Earth's shadow, how bright it
+  will be and for how long. A gentle chime sounds when the card appears and a brighter one as the pass begins. The warning
+  time is 5, 10, 15 or 30 minutes (Settings ▸ Space Station), and a sample card lets you see and hear it.
+  When nothing is flying, Quiet skies shows the next pass.
+- **The station on the map.** Whenever it flies over your home, day or night and seen or not, it is tracked like an
+  aircraft: a station glyph and "ISS · In orbit" label on the map, a chip in the nearby strip, and its own card (altitude and
+  speed in your units, heading, distance, how high in the sky, closest approach, whether the Sun is on it). It takes the
+  featured card while it is in view, is recorded in Recent sightings, and is never given a route, a photo or a flyby card.
+- The orbit is worked out on the Apple TV from the station's published orbital elements (SGP4, the standard method),
+  downloaded from CelesTrak about every 8 hours and kept for a restart or an outage. The download names only the
+  station, never your location. Elements more than 14 days old are not trusted.
+- Design-preview scenes `issupcoming`, `issimminent`, `issnow`, `issover` and `issquiet`, and
+  `design-preview --chimes <dir>` to write the two sounds as WAV files.
+- 63 new tests. The orbit maths is checked against independent references (python-sgp4 for positions; Skyfield with
+  NASA's DE421 ephemeris for sky angles, the Sun, Earth's shadow and a 12-day list of passes), and the physics, shadow,
+  dark-sky, warning-time, flyby, off-map and chime behaviours were each broken on purpose to confirm a test fails.
 
 ## [1.1.1-beta] - 2026-10-30
 
@@ -130,7 +153,8 @@ First beta. tvOS only, installed from Xcode with a free Apple ID.
 - Free-account builds expire after 7 days and must be reinstalled from Xcode.
 - Remote focus behaviour of the zoom buttons has not yet been confirmed on a real Apple TV.
 
-[Unreleased]: https://github.com/Jthe4th/air-traffic/compare/v1.1.1-beta...HEAD
+[Unreleased]: https://github.com/Jthe4th/air-traffic/compare/v1.1.2-beta...HEAD
+[1.1.2-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.1.1-beta...v1.1.2-beta
 [1.1.1-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.1.0-beta...v1.1.1-beta
 [1.1.0-beta]: https://github.com/Jthe4th/air-traffic/compare/v1.0.1-beta...v1.1.0-beta
 [1.0.1-beta]: https://github.com/Jthe4th/air-traffic/releases/tag/v1.0.1-beta

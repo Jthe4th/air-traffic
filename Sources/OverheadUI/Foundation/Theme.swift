@@ -14,6 +14,8 @@ enum Theme {
     static let descend = Color(red: 1.0, green: 0.64, blue: 0.32)
     static let warning = Color(red: 1.0, green: 0.76, blue: 0.28)
     static let danger = Color(red: 1.0, green: 0.36, blue: 0.36)
+    /// The Space Station's colour wherever aircraft take their colour from altitude: warm white, like sunlit metal.
+    static let station = Color(red: 1.0, green: 0.93, blue: 0.62)
 
     // Typography. Serif for names and places, rounded for numbers, small caps for labels.
     static func serif(_ size: CGFloat, weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight, design: .serif) }
@@ -37,6 +39,10 @@ enum Theme {
             return rgb((a.rgb.0 + (b.rgb.0 - a.rgb.0) * f, a.rgb.1 + (b.rgb.1 - a.rgb.1) * f, a.rgb.2 + (b.rgb.2 - a.rgb.2) * f))
         }
         return rgb(stops.last!.rgb)
+    }
+
+    static func tint(_ a: Aircraft, at now: Date) -> Color {
+        a.isSpacecraft ? station : altitudeColor(a.altitudeFt(at: now), onGround: a.onGround)
     }
 
     private static func rgb(_ c: (Double, Double, Double)) -> Color { Color(red: c.0, green: c.1, blue: c.2) }

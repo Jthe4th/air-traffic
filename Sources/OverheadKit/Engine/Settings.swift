@@ -39,6 +39,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// The compass direction you look when watching TV, from your seat toward the screen. Nil until set.
     public var viewerHeadingDeg: Double?
     public var directionNames = DirectionNames()
+    /// Watch for the International Space Station: show it when it flies over, and announce passes you can see.
+    public var issEnabled: Bool = true
+    /// How long before a visible pass the card appears.
+    public var issLeadMinutes: Int = 15
+    public var issChime: Bool = true
+
+    public static let issLeadChoices = [5, 10, 15, 30]
 
     public init() {}
 
@@ -46,6 +53,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case home, homeName, homeSource, mapRadiusNM, alertRadiusNM, units, feed, autoCycle, cycleSeconds, refreshSeconds, demoMode, showTrails, photoContact
         case idleHideSeconds, nightDimming, alertLevel, autoFailover
         case flybyCards, flybyDistanceNM, flybyMaxAltitudeFt, viewerHeadingDeg, directionNames
+        case issEnabled, issLeadMinutes, issChime
     }
 
     // Tolerant decoding so adding a setting later never wipes a saved home location.
@@ -74,6 +82,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
         flybyMaxAltitudeFt = try c.decodeIfPresent(Int.self, forKey: .flybyMaxAltitudeFt) ?? d.flybyMaxAltitudeFt
         viewerHeadingDeg = try c.decodeIfPresent(Double.self, forKey: .viewerHeadingDeg)
         directionNames = try c.decodeIfPresent(DirectionNames.self, forKey: .directionNames) ?? d.directionNames
+        issEnabled = try c.decodeIfPresent(Bool.self, forKey: .issEnabled) ?? d.issEnabled
+        let lead = try c.decodeIfPresent(Int.self, forKey: .issLeadMinutes) ?? d.issLeadMinutes
+        issLeadMinutes = Self.issLeadChoices.contains(lead) ? lead : d.issLeadMinutes
+        issChime = try c.decodeIfPresent(Bool.self, forKey: .issChime) ?? d.issChime
     }
 }
 

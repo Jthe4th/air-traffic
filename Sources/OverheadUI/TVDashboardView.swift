@@ -49,6 +49,14 @@ public struct TVDashboardView: View {
         }
         .onChange(of: engine.settings.mapRadiusNM) { _, _ in ambient.touch() }
         .onChange(of: engine.pinned) { _, _ in ambient.touch() }
+        // A pass wakes the controls like any other activity, and its sounds follow the setting.
+        .onChange(of: engine.stationChime) { _, chime in
+            guard let chime else { return }
+            ambient.touch()
+            #if canImport(AVFoundation)
+            if engine.settings.issChime { Chime.play(chime.kind) }
+            #endif
+        }
         .onChange(of: showSettings) { _, _ in ambient.touch() }
         #if canImport(UIKit)
         // Any remote movement (focus changing) counts as activity.
@@ -107,10 +115,16 @@ public struct TVDashboardView: View {
             TimelineView(.periodic(from: .now, by: 1)) { timeline in
                 let now = fixedNow ?? timeline.date
                 let alerts = engine.alerts(at: now)
+                let flyby = engine.flybyCards(at: now).first
                 VStack(spacing: 14) {
                     if !alerts.isEmpty { AlertBanner(alerts: alerts, units: engine.settings.units) }
-                    if let flyby = engine.flybyCards(at: now).first {
+                    if let flyby {
                         FlybyBanner(card: flyby, units: engine.settings.units).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    // A slim reminder while the pass is far off, or whenever something else is already asking for attention.
+                    if let station = engine.stationCards(at: now).first {
+                        StationBanner(card: station, compact: station.phase == .upcoming || !alerts.isEmpty || flyby != nil)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }

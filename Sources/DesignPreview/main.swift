@@ -7,7 +7,9 @@ import OverheadUI
 
 // Renders the TV layout to PNG so the design can be reviewed without a tvOS simulator.
 //   design-preview --icons <dir>                  app icon and Top Shelf images for the asset catalog
-//   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading, alert, flyby, ambient (append 2 or 3 for later telemetry pages)
+//   design-preview --chimes <dir>                 the Space Station sounds as WAV files
+//   design-preview <output-dir> [scene ...]      scenes: busy, quiet, welcome, ground, nophoto, photoloading, alert, flyby, ambient (append 2 or 3 for later telemetry pages),
+//                                                 issupcoming, issimminent, issnow, issover, issquiet (the Space Station, from its real orbit)
 // Needs network access for map tiles on first run (cached afterwards by URLCache).
 
 @MainActor
@@ -28,6 +30,29 @@ func makePhoto(at url: URL) {
     CGImageDestinationFinalize(dest)
 }
 
+/// The Space Station's orbit as published by CelesTrak on 2026-11-01. The scenes below are drawn from it, so they show a real pass.
+let previewStation = OrbitalElements(
+    name: "ISS (ZARYA)",
+    line1: "1 25544U 98067A   26305.40213002  .00006924  00000+0  13304-3 0  9992",
+    line2: "2 25544  51.6333 341.0833 0007085 335.3698  24.6951 15.49140766593021")!
+
+/// Where the station is a quarter of an hour after its orbit was measured, so "overhead" scenes have it near the preview home.
+func stationOverheadDate() -> Date { previewStation.epoch.addingTimeInterval(3600) }
+
+/// The moment a Space Station scene is drawn at: relative to a real visible pass over the preview home.
+func stationSceneDate(_ scene: String) -> Date {
+    guard let orbit = SatelliteOrbit(previewStation) else { return previewStation.epoch }
+    if scene == "issover" { return stationOverheadDate() }
+    let from = previewStation.epoch
+    guard let pass = PassFinder.visiblePasses(of: orbit, from: DemoFeed.defaultHome, between: from, and: from.addingTimeInterval(10 * 86_400)).first else { return from }
+    switch scene {
+    case "issupcoming": return pass.start.date.addingTimeInterval(-14 * 60)
+    case "issimminent": return pass.start.date.addingTimeInterval(-70)
+    case "issquiet": return pass.start.date.addingTimeInterval(-3 * 3600)
+    default: return pass.start.date.addingTimeInterval(95)        // issnow: under way
+    }
+}
+
 @MainActor
 func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEngine {
     var settings = AppSettings()
@@ -35,6 +60,14 @@ func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEn
     if scene == "welcome" { settings.home = nil }
     if scene == "zoomin" { settings.mapRadiusNM = 5 / Geo.milesPerNM }
     if scene == "zoomout" || scene == "crowded" { settings.mapRadiusNM = 60 / Geo.milesPerNM }
+    if scene.hasPrefix("iss") {
+        // The station feature is off in demo mode, so these scenes use a real (but fixed) home.
+        settings.demoMode = false
+        settings.home = DemoFeed.defaultHome
+        if scene == "issover", let here = SatelliteOrbit(previewStation)?.sample(at: date) {
+            settings.home = Geo.destination(from: here.subpoint, bearing: 250, distanceNM: 6)
+        }
+    }
     if scene == "flyby" {
         // Watching TV while facing south-southwest; the viewer calls the right-hand side "Side door".
         settings.viewerHeadingDeg = 202.5
@@ -50,7 +83,8 @@ func makeEngine(scene: String, photoURL: URL, at date: Date) async -> TrackingEn
     let engine = TrackingEngine(settings: settings, persists: false, photos: Photos(photo: photo))
     var flights = DemoFeed.snapshot(center: engine.home, radiusNM: DemoFeed.loopRadiusNM, at: date)
     if scene == "crowded" { flights += crowd(around: engine.home, count: 110, at: date) }
-    if scene == "quiet" { flights = [] }
+    if scene == "quiet" || scene == "issquiet" { flights = [] }
+    if scene.hasPrefix("iss") { engine.useStationElements(previewStation, at: date) }
     if scene == "ground" {
         flights = [Aircraft(hex: "g1", callsign: "UAL1348", registration: "N77295", typeCode: "B739", position: engine.home,
                             positionTime: date, onGround: true, groundSpeedKt: 12, trackDeg: 90, wakeClass: .large)]
@@ -147,6 +181,16 @@ func run() async {
         renderIcons(to: URL(fileURLWithPath: args.count > 1 ? args[1] : "icons"))
         return
     }
+    if args.first == "--chimes" {
+        let dir = URL(fileURLWithPath: args.count > 1 ? args[1] : "chimes")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        for (name, kind) in [("heads-up", StationChime.Kind.headsUp), ("rising", .rising)] {
+            let url = dir.appendingPathComponent("\(name).wav")
+            try? ChimeTone.wav(for: kind).write(to: url)
+            print("wrote \(url.path)")
+        }
+        return
+    }
     let out = URL(fileURLWithPath: args.first ?? ".")
     try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
     let scenes = args.count > 1 ? Array(args.dropFirst()) : ["busy"]
@@ -159,6 +203,7 @@ func run() async {
     for scene in scenes {
         let name = scene.hasSuffix("2") || scene.hasSuffix("3") ? String(scene.dropLast()) : scene
         let pageOffset = scene.hasSuffix("2") ? 7.0 : scene.hasSuffix("3") ? 14.0 : 0.0
+        let date = name.hasPrefix("iss") ? stationSceneDate(name) : date
         let engine = await makeEngine(scene: name, photoURL: photoURL, at: date)
         let camera = TVDashboardView.camera(for: engine)
         await ImageStore.shared.prefetch(camera.tiles.map { MapStyle.url(for: $0) })

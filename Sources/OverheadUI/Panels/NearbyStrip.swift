@@ -52,11 +52,11 @@ private struct Chip: View {
     var body: some View {
         let a = tracked.aircraft
         let d = units.distance(nm: Geo.distanceNM(home, a.position(at: now)))
-        let tint = Theme.altitudeColor(a.altitudeFt(at: now), onGround: a.onGround)
+        let tint = Theme.tint(a, at: now)
         let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
 
         HStack(spacing: 14) {
-            AirlineBadge(airline: tracked.airline, fallbackText: a.registration.map { String($0.prefix(2)) } ?? "", size: 58)
+            AirlineBadge(airline: tracked.airline, fallbackText: a.registration.map { String($0.prefix(2)) } ?? "", size: 58, spacecraft: a.isSpacecraft)
             VStack(alignment: .leading, spacing: 2) {
                 Text(tracked.flightNumber ?? a.title)
                     .font(Theme.number(28, weight: .bold)).foregroundStyle(Theme.text)
@@ -84,6 +84,7 @@ private struct Chip: View {
     }
 
     private func subtitle(_ a: Aircraft, now: Date) -> String {
+        if a.isSpacecraft { return "In orbit" }
         let type = a.typeCode ?? "—"
         guard let ft = a.altitudeFt(at: now) else { return type }
         let alt = flightLevelText(altitudeFt: Int(ft)) ?? units.altitude(ft: ft).text
