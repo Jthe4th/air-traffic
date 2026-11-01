@@ -881,8 +881,11 @@ let tiangongElements = OrbitalElements(
         let tiangong = e.stationPasses.filter { $0.object == .tiangong }
         #expect(!tiangong.isEmpty && tiangong.allSatisfy { $0.pass.brightestMagnitude <= -1.0 })
         // The reference list has Tiangong passes of magnitude +0.9, -0.4 and -0.1 (starting 1793675759, 1793847194 and 1794101476): none is announced.
-        let starts = Set(tiangong.map { Int($0.pass.start.date.timeIntervalSince1970) })
-        #expect(starts.isDisjoint(with: [1_793_675_759, 1_793_847_194, 1_794_101_476].flatMap { [$0 - 2, $0 - 1, $0, $0 + 1, $0 + 2] }))
+        let starts: Set<Int> = Set(tiangong.map { Int($0.pass.start.date.timeIntervalSince1970) })
+        let faintStarts: [Int] = [1_793_675_759, 1_793_847_194, 1_794_101_476]
+        var nearFaint: Set<Int> = []
+        for start in faintStarts { for offset in -2...2 { nearFaint.insert(start + offset) } }
+        #expect(starts.isDisjoint(with: nearFaint))
         #expect(starts.count == 4)
         // The Space Station has no floor: every pass the finder finds in the same ten-day window is listed, even its faintest (-1.1).
         let now = at(1_793_534_400)
