@@ -80,6 +80,7 @@ fail (write it, watch it fail, then fix).
   uses a plain stack on macOS for previews only.
 - **Always-on behaviour:** `Ambient` owns idle fading, night dimming and the pixel drift. A press on hidden controls
   must only wake them (`consumeWakeUp`); remote movement is detected through `UIFocusSystem.didUpdateNotification`.
+  Nothing makes a sound while `ambient.isNight` (the Space Station chimes are checked in `TVDashboardView`).
 - **Alerts:** an emergency must persist `emergencyConfirmAfter` (12 s) before it shows; tests set it to 0.
 - **Failover:** `FailoverFeed` retries the preferred provider after a window; its tests inject a clock. Never treat
   `CancellationError` as an outage.

@@ -52,7 +52,7 @@ settings against a compass app.
 
 **Space Station.** A card appears 15 minutes (5, 10 or 30 if you prefer, in Settings ▸ Space Station) before the
 International Space Station will be visible from your home, saying when it appears, which way to look, how high it gets and
-how bright it will be, with a sky chart and a gentle chime as it begins. Whenever it flies over your home, day or night,
+how bright it will be, with a sky chart and a gentle chime as it begins (silent while the screen is dimmed at night). Whenever it flies over your home, day or night,
 it also shows on the map and in the strip like any aircraft, labelled ISS. Its orbit is computed on the Apple TV from
 elements downloaded from CelesTrak (nothing about your location is sent); passes are only announced when you could really
 see it: lit by the Sun, sky dark, at least 20° up.

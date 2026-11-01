@@ -139,7 +139,7 @@ struct SettingsView: View {
         } header: {
             Text("Space Station")
         } footer: {
-            Text("A card appears before the Space Station crosses your sky after dark, with where to look, and a chime as it begins. Whenever it flies over your home, in daylight too, it shows on the map like an aircraft. Its orbit is downloaded from CelesTrak, which is told nothing about where you are.")
+            Text("A card appears before the Space Station crosses your sky after dark, with where to look, and a chime as it begins (silent while the screen is dimmed at night). Whenever it flies over your home, in daylight too, it shows on the map like an aircraft. Its orbit is downloaded from CelesTrak, which is told nothing about where you are.")
         }
     }
 

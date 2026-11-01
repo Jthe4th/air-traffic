@@ -16,7 +16,8 @@ Pre-release builds are labelled `-beta`. Apple's bundle version field allows onl
   star crossing the sky after dark, lit by the Sun while your sky is dark and at least 20° above the horizon), a slim
   card says when and which way to look. In the last two minutes and during the pass it grows into a full card with a
   sky chart: when and where it appears, its highest point, where it sets or fades into Earth's shadow, how bright it
-  will be and for how long. A gentle chime sounds when the card appears and a brighter one as the pass begins. The warning
+  will be and for how long. A gentle chime sounds when the card appears and a brighter one as the pass begins, but never while the screen is dimmed
+  for the night (10 PM to 6 AM), when the card still shows, just dimmed. The warning
   time is 5, 10, 15 or 30 minutes (Settings ▸ Space Station), and a sample card lets you see and hear it.
   When nothing is flying, Quiet skies shows the next pass.
 - **The station on the map.** Whenever it flies over your home, day or night and seen or not, it is tracked like an

@@ -49,12 +49,13 @@ public struct TVDashboardView: View {
         }
         .onChange(of: engine.settings.mapRadiusNM) { _, _ in ambient.touch() }
         .onChange(of: engine.pinned) { _, _ in ambient.touch() }
-        // A pass wakes the controls like any other activity, and its sounds follow the setting.
+        // A pass wakes the controls like any other activity. Its sounds follow the setting and stay silent while the screen
+        // is dimmed for the night, when the room is probably asleep.
         .onChange(of: engine.stationChime) { _, chime in
             guard let chime else { return }
             ambient.touch()
             #if canImport(AVFoundation)
-            if engine.settings.issChime { Chime.play(chime.kind) }
+            if engine.settings.issChime && !ambient.isNight { Chime.play(chime.kind) }
             #endif
         }
         .onChange(of: showSettings) { _, _ in ambient.touch() }
